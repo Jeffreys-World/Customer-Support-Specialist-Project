@@ -5,14 +5,21 @@ deterministic 0–100 urgency score, a category, and the list of signals that fi
 The LLM layer later *explains* this score; it never overrides it (PROJECT_PLAN.md §3).
 
 ## Scoring model
-A neutral baseline plus weighted keyword hits, capped to 0–100:
+A neutral baseline plus weighted keyword hits, capped to 0–100. Keyword sets and
+weights were tuned against the real dataset (see results/evaluation.md), which
+showed top-severity tickets cluster on infrastructure/outage/crash/security
+vocabulary:
 
-    base 15
-    + 35  per critical signal   (outage, breach, payment failed, "urgent", …)
-    + 20  per high signal       (broken, not working, error, billing issue, …)
-    + 12  per medium signal     (question, "how do I", slow)
-    +  3  per low signal         (feature request, documentation, feedback)
+    base 28
+    + 30  per critical signal   (outage, breach, payment failed, "urgent", …)
+    + 24  per high signal       (crash, error, server/capacity, billing, …)
+    + 10  per medium signal     (question, "how do I", slow, configure, …)
+    +  1  per low signal         (feature request, documentation, feedback)
     + 10  once, if the customer signals a repeat/escalating contact ("again", "still")
+
+The calibration deliberately favours **recall on the top-severity class over
+overall accuracy** (PROJECT_PLAN.md §7, §10): a lone hard-trigger keyword lands
+below the High threshold on keyword mass alone, and the safety net below lifts it.
 
 ## Critical-class safety net (PROJECT_PLAN.md §7 — the #1 correctness rule)
 The costliest failure is a genuinely critical ticket read as routine — exactly Jordan's
@@ -30,30 +37,30 @@ from typing import Dict, List, Tuple
 from src.schema import Category, ScoredTicket, Ticket
 
 # --- Weights -----------------------------------------------------------------
-BASE_SCORE = 15
-CRITICAL_WEIGHT = 35
-HIGH_WEIGHT = 20
-MEDIUM_WEIGHT = 12
-LOW_WEIGHT = 3
+BASE_SCORE = 28
+CRITICAL_WEIGHT = 30
+HIGH_WEIGHT = 24
+MEDIUM_WEIGHT = 10
+LOW_WEIGHT = 1
 REPEAT_WEIGHT = 10
 
 # --- Signal definitions ------------------------------------------------------
 # Each signal maps a human-readable name -> surface variants matched case-insensitively.
-# Phrases are preferred over bare words where a bare word would be noisy (e.g. "down"
-# matches "download"/"calm down", so we require "system down", "went down", …).
+# Phrases are preferred over bare words where a bare word would be noisy. Sets were
+# expanded from a term-frequency analysis of the real dataset by priority label.
 
 # Hard triggers: presence forces the category to at least High (the safety net).
 HARD_TRIGGERS: Dict[str, List[str]] = {
     "outage": ["outage", "outages"],
     "system down": [
-        "is down", "are down", "system down", "server down", "site down",
-        "website down", "service is down", "everything is down", "went down",
-        "completely down", "totally down",
+        "is down", "are down", "system down", "server down", "servers down",
+        "site down", "website down", "service is down", "service down",
+        "everything is down", "went down", "completely down", "totally down", " down ",
     ],
     "can't log in": [
         "can't log in", "cant log in", "can not log in", "cannot log in",
         "can't login", "cannot login", "unable to log in", "unable to login",
-        "can't access my account", "cannot access my account",
+        "can't access my account", "cannot access my account", "cannot access", "can't access",
     ],
     "security": ["security breach", "security issue", "security vulnerability", "security"],
     "breach": ["breach", "breached", "data breach", "hacked", "compromised account"],
@@ -63,31 +70,48 @@ HARD_TRIGGERS: Dict[str, List[str]] = {
         "transaction failed", "double charged", "charged twice", "unauthorized charge",
         "unauthorised charge",
     ],
+    "service disruption": [
+        "downtime", "disruption", "disrupting", "interruption", "not operational",
+        "unavailable", "service is unavailable",
+    ],
+    "data loss": ["data loss", "lost all", "losing data", "lost my data", "lost our data"],
+    "malware": ["phishing", "malware", "ransomware", "suspicious login", "suspicious activity"],
 }
 
 # Extra critical-weight signals that do NOT force escalation on their own.
 CRITICAL_EXTRA: Dict[str, List[str]] = {
-    "urgent": ["urgent", "urgently", "asap", "emergency", "immediately", "critical"],
+    "urgent": ["urgent", "urgently", "asap", "emergency", "immediately", "critical", "escalate", "escalation"],
 }
 
 HIGH_SIGNALS: Dict[str, List[str]] = {
     "broken": ["broken", "broke"],
-    "not working": ["not working", "doesn't work", "does not work", "won't work", "stopped working"],
-    "multiple users": ["multiple users", "several users", "many users", "all users", "whole team", "entire team"],
-    "error": ["error", "errors", "exception", "crash", "crashed", "crashing"],
-    "billing issue": ["billing issue", "billing problem", "invoice", "overcharged", "wrong charge", "refund"],
+    "not working": ["not working", "doesn't work", "does not work", "won't work",
+                    "stopped working", "no longer works"],
+    "error": ["error", "errors", "exception", "crash", "crashed", "crashes", "crashing",
+              "failing", "fails"],
+    "billing issue": ["billing issue", "billing problem", "invoice", "invoices",
+                      "overcharged", "wrong charge", "refund"],
+    "infrastructure": ["server", "servers", "node", "cluster", "capacity", "overloaded",
+                       "out of memory", "memory pressure", "high load", "degraded",
+                       "latency", "impacted", "impacting", "production", "restore", "operational"],
+    "multiple users": ["multiple users", "several users", "many users", "all users",
+                       "whole team", "entire team"],
 }
 
 MEDIUM_SIGNALS: Dict[str, List[str]] = {
-    "question": ["question", "questions", "clarify", "clarification"],
+    "question": ["question", "questions", "clarify", "clarification", "inquiry"],
     "how do I": ["how do i", "how can i", "how to", "where do i", "is it possible"],
     "slow": ["slow", "slowly", "sluggish", "lagging", "delayed", "taking too long"],
+    "config/admin": ["configure", "setup", "set up", "integration", "permissions",
+                     "subscription", "tracking", "report", "update", "access", "enable"],
 }
 
 LOW_SIGNALS: Dict[str, List[str]] = {
-    "feature request": ["feature request", "feature suggestion", "would be nice", "it would be great if", "suggestion"],
-    "documentation": ["documentation", "docs", "user guide", "manual", "how-to guide"],
+    "feature request": ["feature request", "feature suggestion", "would be nice",
+                        "it would be great if", "suggestion", "enhancement"],
+    "documentation": ["documentation", "docs", "user guide", "manual", "how-to guide", "tutorial"],
     "feedback": ["feedback", "just wanted to say", "thank you", "compliment"],
+    "minor/cosmetic": ["browser", "cache", "clearing cache", "cosmetic", "typo", "display issue"],
 }
 
 REPEAT_SIGNALS: List[str] = [

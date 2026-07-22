@@ -16,5 +16,8 @@ data/raw/
 # A small committed sample (classified_tickets.sample.json) drives the demo UI.
 data/processed/classified_tickets.json
 
+# Runtime UI artifact (agent override decisions logged during a session)
+results/override_log.csv
+
 # OS
 .DS_Store

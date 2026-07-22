@@ -28,6 +28,9 @@ HARD_TRIGGER_PHRASES = {
     "breach": "I think there was a data breach on my account.",
     "locked out": "I am completely locked out of the platform.",
     "payment failed": "My payment failed but I was still charged.",
+    "service disruption": "We are experiencing significant downtime across the platform.",
+    "data loss": "We have suffered data loss on the primary database.",
+    "malware": "We detected malware on several machines.",
 }
 
 
