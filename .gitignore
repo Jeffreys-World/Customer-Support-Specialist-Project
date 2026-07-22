@@ -12,5 +12,9 @@ venv/
 # Raw data (large source CSVs; regenerate data/processed via data_prep.py)
 data/raw/
 
+# Full generated batch output (12MB; regenerate via `python -m src.batch_classify`).
+# A small committed sample (classified_tickets.sample.json) drives the demo UI.
+data/processed/classified_tickets.json
+
 # OS
 .DS_Store
