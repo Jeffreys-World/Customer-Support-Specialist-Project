@@ -1,0 +1,9 @@
+# Jordan's Ticket Triage Assistant — runtime dependencies
+# Pinned to versions compatible with Python 3.9+.
+pandas>=2.0,<2.3
+streamlit>=1.32,<1.40
+anthropic>=0.40,<1.0
+python-dotenv>=1.0,<2.0
+
+# Dev / test
+pytest>=8.0,<9.0
