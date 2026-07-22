@@ -1,0 +1,4 @@
+[tool.pytest.ini_options]
+# Put the repo root on sys.path so tests can `import src.rule_scorer` etc.
+pythonpath = ["."]
+testpaths = ["tests"]
