@@ -62,7 +62,8 @@ HARD_TRIGGERS: Dict[str, List[str]] = {
         "can't login", "cannot login", "unable to log in", "unable to login",
         "can't access my account", "cannot access my account", "cannot access", "can't access",
     ],
-    "security": ["security breach", "security issue", "security vulnerability", "security"],
+    "security": ["security breach", "security issue", "security vulnerability", "security",
+                 "vulnerability", "vulnerabilities"],
     "breach": ["breach", "breached", "data breach", "hacked", "compromised account"],
     "locked out": ["locked out", "lock out", "account locked", "account is locked"],
     "payment failed": [
@@ -80,7 +81,8 @@ HARD_TRIGGERS: Dict[str, List[str]] = {
 
 # Extra critical-weight signals that do NOT force escalation on their own.
 CRITICAL_EXTRA: Dict[str, List[str]] = {
-    "urgent": ["urgent", "urgently", "asap", "emergency", "immediately", "critical", "escalate", "escalation"],
+    "urgent": ["urgent", "urgently", "asap", "emergency", "immediately", "immediate",
+               "time-sensitive", "time sensitive", "critical", "escalate", "escalation"],
 }
 
 HIGH_SIGNALS: Dict[str, List[str]] = {
@@ -92,10 +94,25 @@ HIGH_SIGNALS: Dict[str, List[str]] = {
     "billing issue": ["billing issue", "billing problem", "invoice", "invoices",
                       "overcharged", "wrong charge", "refund"],
     "infrastructure": ["server", "servers", "node", "cluster", "capacity", "overloaded",
-                       "out of memory", "memory pressure", "high load", "degraded",
-                       "latency", "impacted", "impacting", "production", "restore", "operational"],
+                       "overload", "firewall", "out of memory", "memory pressure", "high load",
+                       "degraded", "latency", "impacted", "impacting", "production", "restore",
+                       "operational"],
     "multiple users": ["multiple users", "several users", "many users", "all users",
                        "whole team", "entire team"],
+    # Severity/impact vocabulary expanded from a term-frequency analysis of the real
+    # dataset (results/evaluation.md): these words are strongly over-represented in
+    # top-severity tickets whose urgency isn't stated with an explicit priority word.
+    "impact": ["affected", "affecting", "widespread", "system-wide", "company-wide",
+               "across the board"],
+    "incident": ["incident", "incidents"],
+    "unexpected": ["unexpected", "unexpectedly", "suddenly", "abruptly", "out of nowhere"],
+    "failure": ["failure", "failures", "malfunction", "malfunctioning", "malfunctions",
+                "not functioning", "non-functional"],
+    "unresponsive": ["unresponsive", "not responding", "frozen", "freezes", "freezing",
+                     "hangs", "hanging", "timeout", "timed out", "times out", "timing out"],
+    "inaccessible": ["inaccessible", "unusable", "cannot use", "can't use", "no longer able"],
+    "blocked": ["blocker", "blocking us", "at a standstill", "grinding to a halt",
+                "brought to a halt", "halted"],
 }
 
 MEDIUM_SIGNALS: Dict[str, List[str]] = {

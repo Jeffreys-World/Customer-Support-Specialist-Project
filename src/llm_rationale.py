@@ -160,9 +160,11 @@ def generate_rationale(scored: ScoredTicket, client=None, model: str | None = No
 
 _QUEUE_BY_SIGNAL = [
     ({"payment failed", "billing issue"}, "Billing and Payments"),
-    ({"outage", "system down"}, "Service Outages and Maintenance"),
-    ({"security", "breach", "locked out", "can't log in"}, "IT Support"),
-    ({"error", "not working", "broken"}, "Technical Support"),
+    ({"outage", "system down", "service disruption", "unresponsive", "incident", "impact",
+      "infrastructure"}, "Service Outages and Maintenance"),
+    ({"security", "breach", "locked out", "can't log in", "malware", "data loss"}, "IT Support"),
+    ({"error", "not working", "broken", "failure", "unexpected", "inaccessible", "blocked",
+      "multiple users"}, "Technical Support"),
     ({"feature request"}, "Product Support"),
     ({"documentation", "how do I", "question"}, "General Inquiry"),
 ]

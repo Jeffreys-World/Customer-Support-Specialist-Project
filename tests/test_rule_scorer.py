@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.rule_scorer import HARD_TRIGGERS, score_many, score_ticket
+from src.rule_scorer import BASE_SCORE, HARD_TRIGGERS, score_many, score_ticket
 from src.schema import Category, Ticket
 
 
@@ -108,6 +108,43 @@ def test_matched_signals_are_recorded():
     scored = _score("The billing invoice shows an error and the app is slow.")
     assert scored.matched_signals  # non-empty
     assert "error" in scored.matched_signals
+
+
+# --- Severity vocabulary (recall expansion) ----------------------------------
+
+# One representative phrase per newly added high-severity signal group. Each must
+# add weight above the neutral base and record its signal name.
+SEVERITY_PHRASES = {
+    "impact": "The bug is affecting every customer on the platform.",
+    "incident": "We are managing an active incident right now.",
+    "unexpected": "The service went down unexpectedly this morning.",
+    "failure": "There is a complete failure of the export module.",
+    "unresponsive": "The dashboard is unresponsive and will not load.",
+    "inaccessible": "The reporting page is completely inaccessible.",
+    "blocked": "Our whole team is at a standstill and cannot work.",
+}
+
+
+@pytest.mark.parametrize("signal,phrase", list(SEVERITY_PHRASES.items()))
+def test_severity_vocabulary_adds_weight(signal, phrase):
+    scored = _score(phrase)
+    assert scored.score > BASE_SCORE, f"{signal!r} added no weight (score {scored.score})"
+    assert signal in scored.matched_signals
+
+
+def test_compound_severity_ticket_reaches_high():
+    # Two independent severity signals should clear the High threshold on keyword
+    # mass alone — no safety-net floor involved.
+    scored = _score("Unexpected system failure — the platform is unresponsive for all users.")
+    assert scored.category.at_least(Category.HIGH)
+    assert scored.safety_net_triggered is False
+
+
+def test_vulnerability_is_a_hard_trigger():
+    # "vulnerability"/"vulnerabilities" were added to the security hard trigger.
+    scored = _score("We discovered several vulnerabilities in the login flow.")
+    assert scored.category.at_least(Category.HIGH)
+    assert scored.safety_net_triggered is True
 
 
 def test_repeat_contact_adds_weight():

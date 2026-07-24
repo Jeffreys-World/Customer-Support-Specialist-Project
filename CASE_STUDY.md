@@ -41,7 +41,7 @@ opens the queue, and explains each decision in plain language:
 
 ## The impact
 
-On 11,923 real tickets, the scorer catches **40% of all high-priority tickets**
+On 11,923 real tickets, the scorer catches **49% of all high-priority tickets**
 from keyword signals alone on a generic dataset, and — more importantly —
 **provably escalates 100% of tickets that contain a hard-priority signal**, which
 is the case that burned Jordan. Time-to-sorted-queue drops from ~90 minutes of

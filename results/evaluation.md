@@ -4,28 +4,28 @@ Rule-based scorer vs. dataset ground-truth priority labels, over **11,923 Englis
 
 ## 1. Top-severity (Critical-class) recall — the headline metric
 
-Of the **4,571** tickets the dataset labels `high`, the scorer flagged **1,836** as Critical or High.
+Of the **4,571** tickets the dataset labels `high`, the scorer flagged **2,247** as Critical or High.
 
-> **Top-severity recall = 40.2%**
+> **Top-severity recall = 49.2%**
 
 This is the number that matters most: a `high` ticket read as routine is exactly Jordan's 4-hour billing incident.
 
 ## 2. Overall accuracy & confusion matrix
 
-**Overall accuracy: 40.6%** (4,838/11,923 correct).
+**Overall accuracy: 41.6%** (4,962/11,923 correct).
 
 Rows = dataset label (truth), columns = scorer prediction (collapsed).
 
 | truth ↓ / pred → | low | medium | high | recall |
 |---|---|---|---|---|
-| **high** | 802 | 1,933 | 1,836 | 40.2% |
-| **medium** | 1,038 | 2,458 | 1,456 | 49.6% |
-| **low** | 544 | 1,241 | 615 | 22.7% |
-| **precision** | 22.8% | 43.6% | 47.0% | |
+| **high** | 708 | 1,616 | 2,247 | 49.2% |
+| **medium** | 945 | 2,222 | 1,785 | 44.9% |
+| **low** | 493 | 1,141 | 766 | 20.5% |
+| **precision** | 23.0% | 44.6% | 46.8% | |
 
 ## 3. Where the 🔴 Critical predictions land
 
-The scorer assigned 🔴 Critical to **1,658** tickets. Against the dataset label they split: **880 high**, 575 medium, 203 low. (All of these count as correct top-severity, since Critical → `high`.)
+The scorer assigned 🔴 Critical to **2,566** tickets. Against the dataset label they split: **1,348 high**, 897 medium, 321 low. (All of these count as correct top-severity, since Critical → `high`.)
 
 ## 4. Systematic confusions & examples
 

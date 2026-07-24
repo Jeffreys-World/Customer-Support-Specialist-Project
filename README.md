@@ -48,18 +48,18 @@ so the product's four-level output is collapsed onto the dataset's three levels
 
 | Metric | Value |
 |---|---|
-| **Top-severity (Critical-class) recall** — of `high` tickets, % flagged ≥ High | **40.2%** |
-| Overall accuracy (3-way) | 40.6% |
-| Recall — medium / low | 49.6% / 22.7% |
-| Precision — high / medium | 47.0% / 43.6% |
+| **Top-severity (Critical-class) recall** — of `high` tickets, % flagged ≥ High | **49.2%** |
+| Overall accuracy (3-way) | 41.6% |
+| Recall — medium / low | 44.9% / 20.5% |
+| Precision — high / medium | 46.8% / 44.6% |
 
 Confusion matrix (truth ↓ / prediction →):
 
 | | low | medium | high |
 |---|---|---|---|
-| **high** | 802 | 1,933 | 1,836 |
-| **medium** | 1,038 | 2,458 | 1,456 |
-| **low** | 544 | 1,241 | 615 |
+| **high** | 708 | 1,616 | 2,247 |
+| **medium** | 945 | 2,222 | 1,785 |
+| **low** | 493 | 1,141 | 766 |
 
 **Reading the numbers honestly.** Priority in this generic dataset is only
 weakly expressed through keywords, so a keyword scorer has a real ceiling — most
