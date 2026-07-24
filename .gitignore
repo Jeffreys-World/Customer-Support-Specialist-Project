@@ -21,3 +21,4 @@ results/override_log.csv
 
 # OS
 .DS_Store
+.gstack/
