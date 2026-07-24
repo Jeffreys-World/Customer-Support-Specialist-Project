@@ -207,8 +207,6 @@ def main() -> None:
         chosen = st.multiselect("Priority", CATEGORY_ORDER, default=CATEGORY_ORDER)
         query = st.text_input("Search subject/body")
         only_net = st.checkbox("Only safety-net escalations")
-        st.markdown("---")
-        st.metric("Tickets in queue", len(tickets))
 
     filtered = [
         t for t in tickets
@@ -216,6 +214,12 @@ def main() -> None:
         and (not only_net or t.get("safety_net_triggered"))
         and (not query or query.lower() in (t["subject"] + " " + t["body"]).lower())
     ]
+
+    with st.sidebar:
+        st.markdown("---")
+        # Reflect the *filtered* queue size, not the full dataset — otherwise the
+        # metric reads 800 while the queue shows a handful (found by /qa).
+        st.metric("Tickets in queue", len(filtered))
 
     counts = {c: sum(1 for t in filtered if t["category"] == c) for c in CATEGORY_ORDER}
     cols = st.columns(4)
