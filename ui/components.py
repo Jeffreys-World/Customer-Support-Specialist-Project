@@ -148,7 +148,10 @@ def ticket_row(ticket: Dict, key: str, open_label: str = "Open") -> bool:
                 + '<div class="tc-row__body">'
                 + '<div class="tc-row__top">'
                 + f'<span class="tc-row__name">{esc(req.name)}</span>'
-                + f'<span class="tc-row__sep">|</span>'
+                # The name/subject divider is a CSS border on the subject, not a
+                # "|" text node. As a text node it stayed on the name's line when
+                # a long subject wrapped, leaving a separator pointing at
+                # nothing. Found by /qa.
                 + f'<span class="tc-row__subject">{esc(ticket.get("subject") or "(no subject)")}</span>'
                 + "</div>"
                 + '<div class="tc-row__meta">'

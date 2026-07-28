@@ -199,6 +199,21 @@ def test_demote_headings_caps_at_h6():
     assert "#######" not in demote_headings("##### Deep")
 
 
+# Regression: ISSUE-008 — the requester/subject divider was a literal "|" text
+# node, so a long subject that wrapped left the separator stranded on the line
+# above, pointing at nothing. It is now a CSS border carried by the subject.
+# Found by /qa on 2026-07-28.
+# Report: .gstack/qa-reports/qa-report-localhost-8501-2026-07-28.md
+def test_ticket_row_has_no_literal_separator_text():
+    at = AppTest.from_string(TICKETS_VIEW, default_timeout=90).run()
+    assert not at.exception, at.exception
+    body = _html(at)
+    assert 'class="tc-row__name"' in body, "rows should have rendered"
+    assert '<span class="tc-row__sep">|</span>' not in body, (
+        "name/subject divider must be a CSS border, not a text node"
+    )
+
+
 def test_every_view_renders():
     """Each navigation destination renders without raising."""
     calls = {

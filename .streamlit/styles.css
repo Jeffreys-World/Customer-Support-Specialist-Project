@@ -329,12 +329,18 @@
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  flex-wrap: wrap;
+  /* nowrap, matching the reference: requester and subject stay on one line and
+     the subject truncates. Wrapping dropped a 258-char subject onto its own line
+     and left the divider stranded above it (ISSUE-008). */
+  flex-wrap: nowrap;
+  min-width: 0;
 }
 .tc-row__name {
   font-size: 0.86rem;
   font-weight: 700;
   color: var(--tc-text);
+  flex: none;          /* the name keeps its width; the subject gives way */
+  white-space: nowrap;
 }
 .tc-row__subject {
   font-size: 0.86rem;
@@ -342,6 +348,12 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* Divider rides with the subject so it can never be orphaned on the name's
+     line when a long subject wraps (ISSUE-008). */
+  border-left: 1px solid var(--tc-border-strong);
+  padding-left: 0.45rem;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 .tc-row__meta {
   font-size: 0.75rem;
