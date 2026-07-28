@@ -183,6 +183,25 @@
   padding: 0.1rem 0;
 }
 
+/* Embedded long-form markdown (the evaluation report on Reporting).
+   Streamlit's default markdown type scale is document-sized: even after
+   `demote_headings` pushed the report's h1 down to h3, that h3 still rendered
+   larger than the page's own h1 and read as the start of a new document.
+   This is safe to scope on stMarkdown because every piece of console chrome is
+   emitted through st.html (stHtml), so nothing here can reach it. */
+[data-testid="stMarkdown"] h1 { font-size: 1.25rem; }
+[data-testid="stMarkdown"] h2 { font-size: 1.15rem; }
+[data-testid="stMarkdown"] h3 { font-size: 1.05rem; }
+[data-testid="stMarkdown"] h4 { font-size: 0.95rem; }
+[data-testid="stMarkdown"] h5,
+[data-testid="stMarkdown"] h6 { font-size: 0.88rem; }
+[data-testid="stMarkdown"] :is(h1, h2, h3, h4, h5, h6) {
+  font-weight: 700;
+  color: var(--tc-text);
+  margin: 1rem 0 0.4rem;
+  letter-spacing: -0.01em;
+}
+
 [data-testid="stTabs"] button[role="tab"] {
   font-size: 0.85rem;
   font-weight: 600;

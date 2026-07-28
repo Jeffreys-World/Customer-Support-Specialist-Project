@@ -165,6 +165,40 @@ def test_every_offered_queue_filter_matches_at_least_one_ticket():
         assert filter_tickets(tickets, queues=[queue]), f"{queue!r} matches nothing"
 
 
+# Regression: ISSUE-005 — results/evaluation.md is a standalone document, so it
+# opens with an h1. Rendered raw inside the Reporting page that h1 came out
+# larger than the page title above it and read as the start of a new document.
+# Found by /qa on 2026-07-28.
+# Report: .gstack/qa-reports/qa-report-localhost-8501-2026-07-28.md
+def test_embedded_report_headings_are_demoted():
+    from ui.views.reporting import demote_headings
+
+    src = "# Title\ntext\n## Section\n### Sub\n"
+    out = demote_headings(src).splitlines()
+    # Compare whole lines: "### Title" trivially *contains* "# Title", so a
+    # substring check would pass even if nothing had been demoted.
+    assert out[0] == "### Title"
+    assert "#### Section" in out
+    assert "##### Sub" in out
+
+
+def test_demote_headings_skips_fenced_code():
+    """A `#` comment in a shell example is not a heading."""
+    from ui.views.reporting import demote_headings
+
+    src = "# Real heading\n\n```bash\n# just a comment\necho hi\n```\n"
+    out = demote_headings(src)
+    assert "### Real heading" in out
+    assert "# just a comment" in out, "comment inside a fence must be untouched"
+
+
+def test_demote_headings_caps_at_h6():
+    from ui.views.reporting import demote_headings
+
+    assert demote_headings("##### Deep").startswith("######")
+    assert "#######" not in demote_headings("##### Deep")
+
+
 def test_every_view_renders():
     """Each navigation destination renders without raising."""
     calls = {
