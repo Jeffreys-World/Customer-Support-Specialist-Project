@@ -247,7 +247,12 @@ def filter_row(key_prefix: str, show_queue: bool = True) -> Dict[str, object]:
     Stands in for the reference's Channel / Status / Recommended dropdowns, with
     controls that map to fields this dataset actually has.
     """
-    from ui.domain import QUEUE_OPTIONS  # local import avoids a cycle at module load
+    # Offer only queues the loaded batch actually uses. The full QUEUE_OPTIONS
+    # enum is the set the LLM may *suggest*; three of them (Returns and
+    # Exchanges, Sales and Pre-Sales, Human Resources) never appear in the data,
+    # so listing them gave the agent filters that always returned an empty queue
+    # with no explanation. Found by /qa.
+    from ui.domain import queues_in_use  # local import avoids a cycle at module load
 
     widths = [4, 3, 3, 2] if show_queue else [5, 3, 2]
     cols = st.columns(widths, vertical_alignment="bottom")
@@ -264,7 +269,7 @@ def filter_row(key_prefix: str, show_queue: bool = True) -> Dict[str, object]:
     queues: List[str] = []
     if show_queue:
         queues = cols[2].multiselect(
-            "Queue", QUEUE_OPTIONS, default=None, key=f"{key_prefix}_queue",
+            "Queue", queues_in_use(), default=None, key=f"{key_prefix}_queue",
             placeholder="Queue", label_visibility="collapsed",
         )
     sort = cols[-1].selectbox(

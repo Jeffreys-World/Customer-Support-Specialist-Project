@@ -61,6 +61,19 @@ def load_tickets() -> List[Dict]:
     return []
 
 
+@st.cache_data
+def queues_in_use() -> List[str]:
+    """Queues that actually appear in the loaded batch, in QUEUE_OPTIONS order.
+
+    ``QUEUE_OPTIONS`` is the full set the rationale layer is allowed to suggest.
+    Only a subset shows up in any given batch, so filter controls must be built
+    from this instead — offering a queue with no tickets behind it gives the
+    agent a filter that silently returns nothing.
+    """
+    present = {t.get("suggested_queue", "") for t in load_tickets()}
+    return [q for q in QUEUE_OPTIONS if q in present]
+
+
 def active_data_source() -> Optional[Path]:
     """Which file the queue is being served from — surfaced in Settings."""
     for path in DATA_CANDIDATES:

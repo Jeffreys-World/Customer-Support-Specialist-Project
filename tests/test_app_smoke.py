@@ -143,6 +143,28 @@ def test_ticket_detail_heading_outline_is_nested():
     assert '<h3 class="tc-panel__title"' in body
 
 
+# Regression: ISSUE-004 — the Queue filter listed the full QUEUE_OPTIONS enum, so
+# three queues that never appear in the data (Returns and Exchanges, Sales and
+# Pre-Sales, Human Resources) were selectable and always returned an empty queue
+# with no explanation. Filter controls must be built from the loaded batch.
+# Found by /qa on 2026-07-28.
+# Report: .gstack/qa-reports/qa-report-localhost-8501-2026-07-28.md
+def test_every_offered_queue_filter_matches_at_least_one_ticket():
+    from ui.domain import QUEUE_OPTIONS, filter_tickets, load_tickets, queues_in_use
+
+    tickets = load_tickets()
+    if not tickets:
+        pytest.skip("no data loaded")
+
+    offered = queues_in_use()
+    assert offered, "queue filter must offer something when tickets are loaded"
+    # Never invent a queue the enum doesn't sanction...
+    assert set(offered) <= set(QUEUE_OPTIONS)
+    # ...and never offer one the data can't satisfy.
+    for queue in offered:
+        assert filter_tickets(tickets, queues=[queue]), f"{queue!r} matches nothing"
+
+
 def test_every_view_renders():
     """Each navigation destination renders without raising."""
     calls = {
