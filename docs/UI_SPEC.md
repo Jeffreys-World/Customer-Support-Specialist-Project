@@ -11,10 +11,9 @@ rather than assert.
 | `docs/reference/zendesk-home.png` | Home / conversation list |
 | `docs/reference/zendesk-ticket.png` | Ticket workspace |
 
-> **Status: not yet committed.** Save the two reference screenshots to the paths
-> above. Every row below was checked against the images as described in the
-> design conversation; committing them lets any future session re-run the
-> comparison instead of trusting a written description.
+Both images are committed, so the comparison below is re-runnable: a future
+session can open the reference and the current build side by side rather than
+trusting a written description of what the reference looked like.
 
 ## How to verify
 
@@ -90,6 +89,11 @@ Each of these is a considered departure, not a gap.
 
 5. **Replies are not sent.** The composer is present for layout parity and says
    so in its caption. This project triages; it has no outbound mail path.
+
+6. **No "Apply macro" control.** The reference carries one at the bottom-left of
+   the ticket workspace. Macros are saved reply templates, which presupposes an
+   outbound reply path this project doesn't have (see 5). Adding the button
+   without the behavior behind it would be decoration.
 
 ## Simulated data
 
