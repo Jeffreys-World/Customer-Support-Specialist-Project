@@ -90,6 +90,27 @@ def test_header_count_tracks_active_filter():
     assert chip < baseline_chip
 
 
+# Regression: ISSUE-002 — an over-narrow filter collapsed the two-column layout.
+# `render_queue` returned early from inside `with left:` when the filtered queue
+# was empty, which skipped the `with right:` block entirely and took the whole
+# statistics rail with it. Agreement statistics describes the review log, not the
+# queue, so it must survive a filter that matches nothing.
+# Found by /qa on 2026-07-28.
+# Report: .gstack/qa-reports/qa-report-localhost-8501-2026-07-28.md
+def test_statistics_rail_survives_an_empty_filtered_queue():
+    at = AppTest.from_string(TICKETS_VIEW, default_timeout=90).run()
+    assert not at.exception, at.exception
+    assert "tc-stat__head" in _html(at), "rail missing before filtering"
+
+    at.text_input[0].set_value("zzqqxx-no-ticket-matches-this").run()
+    assert not at.exception, at.exception
+
+    body = _html(at)
+    assert "tc-empty" in body, "empty state should render"
+    assert "tc-stat__head" in body, "statistics rail must survive an empty queue"
+    assert re.search(r'class="tc-chip">0 in view<', body), "header should report zero"
+
+
 def test_every_view_renders():
     """Each navigation destination renders without raising."""
     calls = {

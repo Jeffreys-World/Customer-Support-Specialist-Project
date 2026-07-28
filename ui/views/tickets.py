@@ -63,21 +63,25 @@ def render_queue(
     with left:
         c.section(f"{len(filtered)} tickets")
         if not filtered:
+            # Empty queue is a state, not an exit. Returning here used to skip the
+            # `with right:` block below, so an over-narrow filter collapsed the
+            # two-column layout and took the statistics rail with it — including
+            # Agreement statistics, which describes the review log and has nothing
+            # to do with how many tickets happen to match. Found by /qa.
             c.empty_state(empty_message)
-            return
+        else:
+            shown_key = f"{key_prefix}_shown"
+            shown = st.session_state.get(shown_key, PAGE_SIZE)
+            for ticket in filtered[:shown]:
+                if c.ticket_row(ticket, key=f"{key_prefix}_open_{ticket['id']}"):
+                    state.open_ticket(ticket["id"])
+                    st.rerun()
 
-        shown_key = f"{key_prefix}_shown"
-        shown = st.session_state.get(shown_key, PAGE_SIZE)
-        for ticket in filtered[:shown]:
-            if c.ticket_row(ticket, key=f"{key_prefix}_open_{ticket['id']}"):
-                state.open_ticket(ticket["id"])
-                st.rerun()
-
-        if shown < len(filtered):
-            st.caption(f"Showing {shown} of {len(filtered)}.")
-            if st.button("Load more", key=f"{key_prefix}_more", use_container_width=True):
-                st.session_state[shown_key] = shown + PAGE_SIZE
-                st.rerun()
+            if shown < len(filtered):
+                st.caption(f"Showing {shown} of {len(filtered)}.")
+                if st.button("Load more", key=f"{key_prefix}_more", use_container_width=True):
+                    st.session_state[shown_key] = shown + PAGE_SIZE
+                    st.rerun()
 
     with right:
         _statistics_rail(filtered)
