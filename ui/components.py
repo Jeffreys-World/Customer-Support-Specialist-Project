@@ -87,7 +87,14 @@ def tags_html(tags: Sequence[str], limit: int = 3) -> str:
 
 
 def section(title: str) -> None:
-    st.html(f'<div class="tc-section">{esc(title)}</div>')
+    """A list/section heading.
+
+    Real <h2>, not a styled div. Replacing Streamlit's st.subheader with custom
+    markup removed every heading element from the page, leaving screen-reader
+    users with no structure to navigate by (/qa measured h1:0 h2:0). The class
+    carries the styling; the tag carries the semantics.
+    """
+    st.html(f'<h2 class="tc-section">{esc(title)}</h2>')
 
 
 def empty_state(message: str) -> None:
@@ -105,11 +112,13 @@ def app_bar(title: str, subtitle: str, chip: Optional[str] = None, agent_initial
     chip_html = f'<span class="tc-chip">{esc(chip)}</span>' if chip else ""
     st.html(
         '<div class="tc-appbar">'
-        f'<div><p class="tc-appbar__title">{esc(title)}</p>'
+        # <h1>, not <p>: this is the page title, and it was the missing top of
+        # the heading outline (/qa, ISSUE-006).
+        f'<div><h1 class="tc-appbar__title">{esc(title)}</h1>'
         f'<p class="tc-appbar__sub">{esc(subtitle)}</p></div>'
         '<div class="tc-appbar__spacer"></div>'
         f"{chip_html}"
-        f'<div class="tc-appbar__avatar">{esc(agent_initials)}</div>'
+        f'<div class="tc-appbar__avatar" aria-hidden="true">{esc(agent_initials)}</div>'
         "</div>"
     )
 
@@ -182,8 +191,9 @@ def stat_block(head: str, period: str, items: Iterable[Tuple[str, object, str]])
 # --- Detail-view panels -------------------------------------------------------
 
 def panel_title(text: str, badge: bool = False) -> None:
+    """Panel heading — <h3>, one level below the section headings it sits under."""
     suffix = " " + demo_badge_html() if badge else ""
-    st.html(f'<div class="tc-panel__title">{esc(text)}{suffix}</div>')
+    st.html(f'<h3 class="tc-panel__title">{esc(text)}{suffix}</h3>')
 
 
 def field(label: str, value: object, value_html: Optional[str] = None) -> None:

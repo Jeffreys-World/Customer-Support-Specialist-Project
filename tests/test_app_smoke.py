@@ -111,6 +111,38 @@ def test_statistics_rail_survives_an_empty_filtered_queue():
     assert re.search(r'class="tc-chip">0 in view<', body), "header should report zero"
 
 
+# Regression: ISSUE-006 — the console rendered no heading elements at all.
+# Replacing st.title/st.subheader with styled <div>/<p> markup left the page with
+# h1:0 h2:0, so screen-reader users had no outline to navigate by. The classes
+# carry the look; the tags have to carry the meaning.
+# Found by /qa on 2026-07-28.
+# Report: .gstack/qa-reports/qa-report-localhost-8501-2026-07-28.md
+def test_views_render_a_heading_outline():
+    at = AppTest.from_string(TICKETS_VIEW, default_timeout=90).run()
+    assert not at.exception, at.exception
+    body = _html(at)
+    assert '<h1 class="tc-appbar__title"' in body, "page title must be an h1"
+    assert '<h2 class="tc-section"' in body, "section headings must be h2"
+
+
+def test_ticket_detail_heading_outline_is_nested():
+    script = (
+        "from ui.views import tickets\n"
+        "from ui import state, domain\n"
+        "ts = domain.load_tickets()\n"
+        "if ts:\n"
+        "    state.open_ticket(ts[0]['id'])\n"
+        "tickets.render()\n"
+    )
+    at = AppTest.from_string(script, default_timeout=90).run()
+    assert not at.exception, at.exception
+    body = _html(at)
+    assert '<h1 class="tc-appbar__title"' in body
+    assert '<h2 class="tc-section"' in body
+    # Panels sit one level below the section they belong to.
+    assert '<h3 class="tc-panel__title"' in body
+
+
 def test_every_view_renders():
     """Each navigation destination renders without raising."""
     calls = {

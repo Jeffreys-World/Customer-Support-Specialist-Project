@@ -398,7 +398,10 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--tc-muted);
-  margin-bottom: 0.55rem;
+  /* Explicit all-sides margin: these are real <h1>/<h2>/<h3> elements (see
+     ISSUE-006), so the browser's default heading margins would otherwise push
+     panels out of alignment. */
+  margin: 0 0 0.55rem;
 }
 .tc-field {
   margin-bottom: 0.7rem;
