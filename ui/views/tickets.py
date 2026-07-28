@@ -1,0 +1,157 @@
+"""The queue: a filtered ticket list, and the detail view when one is open.
+
+A ticket opens *inside* this view rather than as its own navigation entry, which
+is how Zendesk works — opening a ticket adds a tab to the workspace, it doesn't
+take you somewhere else. ``ui.state`` holds the open-tab list.
+"""
+
+from __future__ import annotations
+
+from typing import Dict, List, Optional
+
+import streamlit as st
+
+from ui import components as c
+from ui import domain, state
+from ui.views import ticket_detail
+
+PAGE_SIZE = 25
+
+
+def _apply_sort(tickets: List[Dict], sort: str) -> List[Dict]:
+    if sort == "Oldest first":  # longest-waiting first — the SLA-risk lens
+        return sorted(tickets, key=lambda t: -domain.simulated_age_hours(t["id"]))
+    if sort == "Highest score":
+        return sorted(tickets, key=lambda t: -int(t.get("score", 0)))
+    return sorted(tickets, key=domain.sort_key)
+
+
+def render_queue(
+    tickets: List[Dict],
+    title: str,
+    subtitle: str,
+    key_prefix: str,
+    empty_message: str = "No tickets match these filters.",
+    show_queue_filter: bool = True,
+) -> None:
+    """Filter row, statistics rail, and the paged list of ticket rows."""
+    # The header renders above the filter row but must report the *filtered*
+    # count, so it is reserved now and written after filtering. Reporting
+    # len(tickets) here is ISSUE-001 exactly: a header that reads 11923 while the
+    # list below it shows six. See tests/test_app_smoke.py.
+    header = st.empty()
+
+    toast = state.pop_last_action()
+    if toast:
+        st.success(toast)
+
+    filters = c.filter_row(key_prefix, show_queue=show_queue_filter)
+    filtered = domain.filter_tickets(
+        tickets,
+        categories=filters["categories"] or None,
+        queues=filters["queues"] or None,
+        query=str(filters["query"]),
+    )
+    filtered = _apply_sort(filtered, str(filters["sort"]))
+
+    with header:
+        c.app_bar(title, subtitle, chip=f"{len(filtered)} in view")
+
+    st.html("<div style='height:.35rem'></div>")
+    left, right = st.columns([7, 3], gap="medium")
+
+    with left:
+        c.section(f"{len(filtered)} tickets")
+        if not filtered:
+            c.empty_state(empty_message)
+            return
+
+        shown_key = f"{key_prefix}_shown"
+        shown = st.session_state.get(shown_key, PAGE_SIZE)
+        for ticket in filtered[:shown]:
+            if c.ticket_row(ticket, key=f"{key_prefix}_open_{ticket['id']}"):
+                state.open_ticket(ticket["id"])
+                st.rerun()
+
+        if shown < len(filtered):
+            st.caption(f"Showing {shown} of {len(filtered)}.")
+            if st.button("Load more", key=f"{key_prefix}_more", use_container_width=True):
+                st.session_state[shown_key] = shown + PAGE_SIZE
+                st.rerun()
+
+    with right:
+        _statistics_rail(filtered)
+
+
+def _statistics_rail(tickets: List[Dict]) -> None:
+    """Right-hand cards. Both are computed from real data — nothing simulated here."""
+    counts = domain.category_counts(tickets)
+    breached = sum(1 for t in tickets if domain.sla_breached(t))
+    net = sum(1 for t in tickets if t.get("safety_net_triggered"))
+
+    with st.container(border=True):
+        c.stat_block(
+            "Triage statistics", "Tickets in view",
+            [
+                ("Critical", counts["Critical"], "#CC3340"),
+                ("High", counts["High"], "#ED8F1C"),
+                ("Safety net", net, "#1F73B7"),
+            ],
+        )
+        st.caption(f"{breached} past SLA target")
+
+    with st.container(border=True):
+        stats = domain.agreement_stats()
+        if stats["total"]:
+            c.stat_block(
+                "Agreement statistics", f"{stats['total']} reviewed",
+                [
+                    ("Agreed with AI", f"{stats['agreement_pct']}%", "#2E8B57"),
+                    ("Overridden", stats["overridden"], "#68737D"),
+                ],
+            )
+        else:
+            c.stat_block("Agreement statistics", "No reviews yet", [("Reviewed", 0, "#68737D")])
+            st.caption("Confirm or override a ticket to start building this.")
+
+
+# --- Navigation entry points --------------------------------------------------
+
+def _open_detail_or(render_list) -> None:
+    """Show the detail view when a ticket is open, otherwise the list."""
+    tickets = domain.load_tickets()
+    active = state.find_ticket(tickets, state.active_ticket_id())
+    if active is not None:
+        ticket_detail.render(active, tickets)
+    else:
+        render_list(tickets)
+
+
+def render() -> None:
+    _open_detail_or(
+        lambda tickets: render_queue(
+            tickets,
+            "Tickets",
+            "Every open ticket, pre-sorted by urgency.",
+            key_prefix="tickets",
+        )
+    )
+
+
+def render_safety_net() -> None:
+    """Only tickets the Critical-class safety net escalated.
+
+    This is the project's most important correctness rule, so it gets its own
+    destination rather than being buried behind a checkbox.
+    """
+    def _list(tickets: List[Dict]) -> None:
+        escalated = [t for t in tickets if t.get("safety_net_triggered")]
+        render_queue(
+            escalated,
+            "Safety-net escalations",
+            "Tickets force-escalated to at least High by a hard-priority signal.",
+            key_prefix="safetynet",
+            empty_message="No safety-net escalations in this batch.",
+        )
+
+    _open_detail_or(_list)

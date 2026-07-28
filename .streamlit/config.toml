@@ -1,0 +1,27 @@
+# Base theme tokens for the triage console.
+#
+# Only what Streamlit's own theming can express lives here: page colours, text
+# colour, and the font family. Everything the theme API cannot reach — the dark
+# navigation rail, card surfaces, the type scale — lives in `styles.css`, which
+# `ui/theme.py` injects at boot. Keeping the split explicit means a Streamlit
+# upgrade that changes internal DOM hooks only ever breaks one file.
+#
+# Palette follows Zendesk Garden's published values so the console reads as a
+# peer of the tool it is modelled on.
+
+[theme]
+base = "light"
+primaryColor = "#1F73B7"            # Garden blue — actions, focus rings, selection
+backgroundColor = "#F5F7F9"         # workspace grey the cards sit on
+secondaryBackgroundColor = "#FFFFFF" # widget + card fills
+textColor = "#2F3941"               # Garden primary text
+font = "sans serif"
+
+[browser]
+# Portfolio repo: don't phone home from a reviewer's machine.
+gatherUsageStats = false
+
+[client]
+# Errors belong in the terminal, not stamped across the UI a reviewer is looking at.
+showErrorDetails = true
+toolbarMode = "minimal"

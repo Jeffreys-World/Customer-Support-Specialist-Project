@@ -1,7 +1,11 @@
 # Jordan's Ticket Triage Assistant — runtime dependencies
 # Pinned to versions compatible with Python 3.9+.
 pandas>=2.0,<2.3
-streamlit>=1.32,<1.40
+# Pinned to 1.39.x: the console's shell styling (.streamlit/styles.css) targets
+# Streamlit's internal data-testid hooks for the dark navigation rail, which the
+# theme API cannot express. Those hooks are not a public API. Read the CSS
+# CONTRACT comment at the top of styles.css before widening this pin.
+streamlit>=1.39,<1.40
 anthropic>=0.40,<1.0
 python-dotenv>=1.0,<2.0
 

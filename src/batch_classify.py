@@ -25,7 +25,7 @@ import csv
 import json
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from src.llm_rationale import (
     RationaleUnavailable,
@@ -34,7 +34,7 @@ from src.llm_rationale import (
     generate_rationale,
 )
 from src.rule_scorer import score_many
-from src.schema import ScoredTicket, Ticket
+from src.schema import Category, ScoredTicket, Ticket
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_INPUT = REPO_ROOT / "data" / "processed" / "tickets.csv"
@@ -97,10 +97,62 @@ def attach_rationales(
         print(f"{llm_failures} ticket(s) fell back after an API error.")
 
 
-def run(input_path: Path, output_path: Path, limit: Optional[int], with_rationale: bool) -> List[ScoredTicket]:
+def stratified_sample(scored: List[ScoredTicket], size: int, floor: int = 40) -> List[ScoredTicket]:
+    """Draw ``size`` tickets spanning all four priorities.
+
+    ``--limit`` slices the head of an already-sorted list, so it always returns
+    the most urgent N — ask it for 800 and you get 800 Critical tickets and a
+    demo where the priority filter has nothing to filter. This draws
+    proportionally instead, so the sample stays a truthful miniature of the real
+    distribution while still showing every level.
+
+    Deterministic by construction: within each category tickets are ordered by
+    id and taken at an even stride, so the same input always yields the same
+    sample — no RNG, no seed to pass, byte-identical output on every run.
+    """
+    buckets: Dict[Category, List[ScoredTicket]] = {c: [] for c in Category}
+    for s in scored:
+        buckets[s.category].append(s)
+
+    total = len(scored)
+    if total == 0:
+        return []
+
+    # Proportional target per category, lifted to `floor` so no level is too thin
+    # to demonstrate, and never more than the category actually holds.
+    targets: Dict[Category, int] = {}
+    for cat, items in buckets.items():
+        proportional = round(size * len(items) / total)
+        targets[cat] = min(len(items), max(proportional, min(floor, len(items))))
+
+    picked: List[ScoredTicket] = []
+    for cat, items in buckets.items():
+        take = targets[cat]
+        if take <= 0:
+            continue
+        ordered = sorted(items, key=lambda s: s.ticket.id)
+        stride = max(1, len(ordered) // take)
+        picked.extend(ordered[::stride][:take])
+
+    # Re-sort most urgent first: the UI renders tickets in file order and does
+    # not sort them itself, so a sample left in category-draw order would show a
+    # scrambled queue.
+    picked.sort(key=lambda s: (-s.category.rank, -s.score, s.ticket.id))
+    return picked
+
+
+def run(
+    input_path: Path,
+    output_path: Path,
+    limit: Optional[int],
+    with_rationale: bool,
+    stratified: Optional[int] = None,
+) -> List[ScoredTicket]:
     tickets = load_tickets(input_path)
     scored = score_many(tickets)  # already sorted most-urgent first
-    if limit is not None:
+    if stratified is not None:
+        scored = stratified_sample(scored, stratified)
+    elif limit is not None:
         scored = scored[:limit]
 
     attach_rationales(scored, with_rationale)
@@ -131,12 +183,23 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--limit", type=int, default=None, help="Only classify the top-N tickets.")
     parser.add_argument(
+        "--stratified",
+        type=int,
+        default=None,
+        metavar="N",
+        help=(
+            "Write an N-ticket sample drawn across all four priorities instead of "
+            "the top N. Use this for the committed demo sample — --limit returns "
+            "only the most urgent tickets."
+        ),
+    )
+    parser.add_argument(
         "--with-rationale",
         action="store_true",
         help="Use the live Claude rationale layer (requires ANTHROPIC_API_KEY).",
     )
     args = parser.parse_args(argv)
-    run(args.input, args.output, args.limit, args.with_rationale)
+    run(args.input, args.output, args.limit, args.with_rationale, args.stratified)
     return 0
 
 

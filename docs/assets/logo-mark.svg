@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="Triage console mark">
+  <!-- Mark motif: three bars of descending width = a queue sorted by urgency.
+       The flag on the top bar is the safety net surfacing the critical one. -->
+  <rect width="48" height="48" rx="12" fill="#1F73B7"/>
+  <rect x="11" y="13.5" width="19" height="4.5" rx="2.25" fill="#FFFFFF"/>
+  <circle cx="35.5" cy="15.75" r="3.75" fill="#FFC24B"/>
+  <rect x="11" y="21.75" width="14" height="4.5" rx="2.25" fill="#FFFFFF" fill-opacity="0.72"/>
+  <rect x="11" y="30" width="9" height="4.5" rx="2.25" fill="#FFFFFF" fill-opacity="0.46"/>
+</svg>

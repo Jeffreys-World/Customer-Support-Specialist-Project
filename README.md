@@ -25,10 +25,19 @@ triage automatically.
 3. A **Claude rationale layer** explains the score in one or two bullets and
    suggests a queue. It *explains* the score; it never re-decides it.
 4. A **batch job** runs the whole dataset overnight into `classified_tickets.json`.
-5. A **Streamlit UI** shows the pre-sorted queue, per-ticket detail, and a
-   confirm/adjust control that logs every agent override.
+5. A **Streamlit console** modelled on Zendesk's Agent Workspace shows the
+   pre-sorted queue, a full ticket workspace, and a confirm/adjust control that
+   logs every agent override.
 
-### The queue view
+### The console
+
+A dark navigation rail with grouped menus (Your work / Shared work / Completed
+work / Insights), a Home dashboard, a filterable queue, and a three-column ticket
+workspace: properties on the left, the conversation and the AI rationale as an
+internal note in the middle, requester context on the right.
+
+Region-by-region parity against the Zendesk reference is tracked in
+[`docs/UI_SPEC.md`](docs/UI_SPEC.md).
 
 ```
 🔴 Critical  92  Payment failed on renewal, account locked out   Billing and Payments   ⚠️ breached  🛡️
@@ -36,6 +45,25 @@ triage automatically.
 🟡 Medium    48  How do I export my report to PDF?                General Inquiry        18h left
 🟢 Low       29  Feature request: dark mode would be nice         Product Support        60h left
 ```
+
+### Real data vs. simulated demo data
+
+The console's layout follows Zendesk, which displays requester identity,
+conversation threads, and interaction history. **This dataset contains none of
+those.** Rather than leave the panels empty or quietly invent content, they are
+filled with values derived deterministically from the ticket id, and every such
+panel renders a `simulated` badge. The Settings page lists the full breakdown.
+
+| Real | Simulated for demonstration |
+|---|---|
+| Priority, urgency score, category | Requester name, email, phone, organization |
+| Matched keyword signals | Requester local time |
+| Critical-class safety-net state | Agent reply turns in the thread |
+| AI rationale and suggested queue | Interaction history |
+| Subject, body, tags, ground-truth labels | Ticket age and the SLA countdown |
+| Your confirm/override decisions, and the agreement statistics computed from them | |
+
+Nothing in the simulated column influences triage.
 
 ## Results (measured, not estimated)
 
@@ -113,7 +141,7 @@ python src/data_prep.py
 # 2. Classify the batch (score-only; no API key needed)
 python -m src.batch_classify
 
-# 3. Launch the triage UI
+# 3. Launch the triage console
 streamlit run app.py
 
 # 4. Reproduce the evaluation numbers
@@ -122,6 +150,21 @@ python -m src.evaluate
 # 5. Run the test suite (safety net + UI smoke test)
 pytest -q
 ```
+
+### Regenerating the committed demo sample
+
+A fresh clone has no `classified_tickets.json`, so the console falls back to
+`classified_tickets.sample.json`. That sample must span all four priorities —
+`--limit` slices the head of an already-sorted list and would return only
+Critical tickets, leaving the priority filter with nothing to filter:
+
+```bash
+python -m src.batch_classify --stratified 800 \
+  --output data/processed/classified_tickets.sample.json
+```
+
+The draw is proportional to the real distribution and fully deterministic, so
+regenerating it produces a byte-identical file.
 
 ### Optional — live Claude rationales
 
