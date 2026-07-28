@@ -49,7 +49,11 @@ def main() -> None:
         page_title="Triage Console",
         page_icon="🎫",
         layout="wide",
-        initial_sidebar_state="expanded",
+        # "auto", not "expanded": expanded forces the 268px rail open on a phone,
+        # where it renders as an overlay covering the queue the agent came to
+        # read. "auto" keeps it open on desktop and collapsed on narrow screens.
+        # Found by /qa.
+        initial_sidebar_state="auto",
     )
     theme.inject_css()
     st.logo(
