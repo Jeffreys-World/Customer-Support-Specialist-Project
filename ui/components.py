@@ -303,6 +303,31 @@ def filter_row(key_prefix: str, show_queue: bool = True) -> Dict[str, object]:
     return {"query": query, "categories": cats, "queues": queues, "sort": sort}
 
 
+def kpi_card(label: str, value: object, sub: str = "", color: str = "var(--tc-text)") -> str:
+    """One dashboard KPI tile: big number, label, and a qualifying caption.
+
+    ``sub`` is not decoration. Several of these figures are only meaningful with
+    their coverage attached (the satisfaction average describes the third of the
+    batch that is closed), and the caption is where that qualifier goes so the
+    number is never shown bare.
+    """
+    sub_html = f'<div class="tc-kpi__sub">{esc(sub)}</div>' if sub else ""
+    return (
+        f'<div class="tc-kpi"><div class="tc-kpi__label">{esc(label)}</div>'
+        f'<div class="tc-kpi__value" style="color:{color}">{esc(value)}</div>'
+        f"{sub_html}</div>"
+    )
+
+
+def kpi_row(cards: Sequence[Tuple[str, object, str, str]]) -> None:
+    """Render KPI tiles across an even grid."""
+    cols = st.columns(len(cards))
+    for col, (label, value, sub, color) in zip(cols, cards):
+        with col:
+            with st.container(border=True):
+                st.html(kpi_card(label, value, sub, color))
+
+
 def profile_menu(name: str = "Jordan Rivera", role: str = "Support Specialist",
                  initials: str = "JR") -> None:
     """The rail-foot profile menu: avatar, name, and a quick-access dropdown.

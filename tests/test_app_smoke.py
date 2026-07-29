@@ -258,6 +258,44 @@ def test_priority_markup_uses_css_variables_not_literal_hex():
     assert priority("Critical").color == "#CC3340"
 
 
+# The Dashboard's integrity panel is the one place the project admits what its
+# data cannot support. It must be computed from the loaded batch, not transcribed
+# from a one-off analysis, or it will quietly go stale when the batch changes.
+def test_dashboard_integrity_panel_is_computed_from_the_batch():
+    from ui import domain
+
+    facts = domain.data_integrity()
+    assert facts["total"] > 0
+
+    si = facts["subject_independence"]
+    # Independence: chi-square at or below its degrees of freedom, effect size ~0.
+    assert si["chi2"] <= si["dof"] * 1.5, "subject/label association is stronger than expected"
+    assert si["cramers_v"] < 0.15, f"Cramer's V unexpectedly high: {si['cramers_v']}"
+
+    # The timestamp columns must still be recognised as incoherent, since two
+    # charts are omitted from the product on the strength of it.
+    assert facts["timestamp_pairs"] > 0
+    assert facts["timestamp_inverted_rate"] > 0.2, (
+        "resolution-before-response rate collapsed — if the data was fixed, "
+        "the omitted resolution-time chart should be reconsidered"
+    )
+
+    assert 0 < facts["csat"]["coverage"] < 1, "CSAT should cover only closed tickets"
+
+
+def test_dashboard_renders_kpis_and_integrity_panel():
+    at = AppTest.from_string(
+        "from ui.views import dashboard\ndashboard.render()\n", default_timeout=180
+    ).run()
+    assert not at.exception, at.exception
+    body = _html(at)
+    assert body.count("tc-kpi__value") == 5, "expected five KPI tiles"
+    assert "tc-integrity" in body, "data-integrity panel must render"
+    # Neither omitted chart may reappear without the data supporting it.
+    assert "Avg. Resolution Time" not in body
+    assert "resolution time" in body.lower(), "the omission must be explained, not silent"
+
+
 def test_every_view_renders():
     """Each navigation destination renders without raising."""
     calls = {

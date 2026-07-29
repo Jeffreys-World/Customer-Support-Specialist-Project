@@ -141,6 +141,117 @@ def filter_tickets(
     return out
 
 
+# --- Dashboard analytics ------------------------------------------------------
+
+@st.cache_data
+def tickets_frame() -> "pd.DataFrame":
+    """The loaded batch as a DataFrame, for the Dashboard's charts.
+
+    Kept out of the queue path deliberately: the ticket list and detail views
+    work on plain dicts and must stay free of a pandas import on the hot path.
+    Only the Dashboard pays for this, and it is cached.
+    """
+    import pandas as pd
+
+    frame = pd.DataFrame(load_tickets())
+    if frame.empty:
+        return frame
+    # csat arrives as a string ("" for the ~67% of tickets that are not closed).
+    frame["csat_value"] = pd.to_numeric(frame.get("csat"), errors="coerce")
+    return frame
+
+
+def count_by(column: str) -> Dict[str, int]:
+    """Value counts for one column, descending. Empty strings are dropped."""
+    frame = tickets_frame()
+    if frame.empty or column not in frame:
+        return {}
+    series = frame[column].fillna("").astype(str).str.strip()
+    series = series[series != ""]
+    return series.value_counts().to_dict()
+
+
+def csat_summary() -> Dict[str, object]:
+    """Average satisfaction and, just as importantly, its coverage.
+
+    Coverage is reported alongside the mean everywhere it is shown. Only closed
+    tickets carry a rating in this dataset — roughly a third of the batch — so a
+    bare average would silently describe a minority of the queue.
+    """
+    frame = tickets_frame()
+    if frame.empty or "csat_value" not in frame:
+        return {"mean": None, "rated": 0, "total": 0, "coverage": 0.0, "histogram": {}}
+    values = frame["csat_value"].dropna()
+    total = len(frame)
+    hist = {int(k): int(v) for k, v in values.value_counts().sort_index().items()}
+    return {
+        "mean": round(float(values.mean()), 2) if len(values) else None,
+        "rated": int(len(values)),
+        "total": total,
+        "coverage": len(values) / total if total else 0.0,
+        "histogram": hist,
+    }
+
+
+def status_summary() -> Dict[str, object]:
+    """Open / pending / closed counts and the unresolved rate.
+
+    The unresolved rate is what stands in for "average resolution time": it is
+    computable from a status column that is fully populated, where a duration is
+    not computable from timestamps that run backwards. See :func:`data_integrity`.
+    """
+    counts = count_by("status")
+    total = sum(counts.values())
+    closed = counts.get("Closed", 0)
+    return {
+        "counts": counts,
+        "total": total,
+        "closed": closed,
+        "unresolved": total - closed,
+        "unresolved_rate": (total - closed) / total if total else 0.0,
+    }
+
+
+def data_integrity() -> Dict[str, object]:
+    """Measured data-quality facts backing the Dashboard's integrity panel.
+
+    Every number the panel prints is computed here from the loaded batch rather
+    than hardcoded from a one-off analysis, so the panel stays true if the batch
+    is regenerated or the dataset is swapped again.
+    """
+    import pandas as pd
+
+    from src.evaluate import independence
+
+    frame = tickets_frame()
+    out: Dict[str, object] = {"total": len(frame)}
+    if frame.empty:
+        return out
+
+    # 1. Is the ground-truth label predictable from the ticket's own subject?
+    pairs = [
+        (s, p) for s, p in zip(frame.get("subject", []), frame.get("true_priority", []))
+        if s and p
+    ]
+    out["subject_independence"] = independence(pairs) if pairs else None
+    out["unique_subjects"] = int(frame["subject"].nunique()) if "subject" in frame else 0
+
+    # 2. Do the timestamps describe a coherent timeline?
+    first = pd.to_datetime(frame.get("first_response_at"), errors="coerce")
+    resolved = pd.to_datetime(frame.get("resolved_at"), errors="coerce")
+    both = first.notna() & resolved.notna()
+    inverted = int(((resolved < first) & both).sum())
+    out["timestamp_pairs"] = int(both.sum())
+    out["timestamp_inverted"] = inverted
+    out["timestamp_inverted_rate"] = inverted / int(both.sum()) if both.sum() else 0.0
+    spread = first.dropna()
+    out["response_days"] = int(spread.dt.normalize().nunique()) if len(spread) else 0
+
+    # 3. How much of the batch carries a satisfaction rating at all?
+    out["csat"] = csat_summary()
+    return out
+
+
 def category_counts(tickets: Iterable[Dict]) -> Dict[str, int]:
     """Count per priority, always returning all four keys so KPI rows never gap."""
     counts = {c.value: 0 for c in Category}

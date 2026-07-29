@@ -532,6 +532,62 @@
   font-size: 0.87rem;
 }
 
+/* --- Dashboard KPI tiles -------------------------------------------------- */
+.tc-kpi {
+  font-family: var(--tc-font);
+  padding: 0.1rem 0;
+}
+.tc-kpi__label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--tc-muted);
+  margin-bottom: 0.3rem;
+}
+.tc-kpi__value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+.tc-kpi__sub {
+  font-size: 0.72rem;
+  color: var(--tc-muted);
+  margin-top: 0.25rem;
+}
+
+/* Data-integrity panel — a warning surface, not a card. It exists to say a
+   number is untrustworthy, so it must not look like the numbers around it. */
+.tc-integrity {
+  background: var(--tc-note-bg);
+  border: 1px solid var(--tc-note-border);
+  border-left: 3px solid var(--tc-high);
+  border-radius: var(--tc-radius-sm);
+  padding: 0.85rem 1rem;
+  font-family: var(--tc-font);
+}
+.tc-integrity__head {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--tc-note-head);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.45rem;
+}
+.tc-integrity p {
+  font-size: 0.84rem;
+  color: var(--tc-text);
+  margin: 0 0 0.5rem;
+}
+.tc-integrity p:last-child { margin-bottom: 0; }
+.tc-integrity code {
+  font-size: 0.8rem;
+  background: rgba(127, 127, 127, 0.14);
+  border-radius: 3px;
+  padding: 0.05rem 0.25rem;
+}
+
 /* --- Profile menu at the foot of the rail --------------------------------- */
 .tc-profile__rule {
   border-top: 1px solid rgba(255, 255, 255, 0.14);
