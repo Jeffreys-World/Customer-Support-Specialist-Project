@@ -86,8 +86,16 @@ def main() -> None:
             # Dashboard used to sit under an "Insights" group as "Reporting",
             # which buried the only analytics surface in the product.
             "": [
+                # No url_path on the default page, deliberately. Streamlit serves
+                # whichever page is `default=True` at "/" and never registers its
+                # url_path as a route, so `url_path="home"` was dead config that
+                # claimed a URL the router does not know: hitting /home produced
+                # Streamlit's "page does not seem to exist" dialog before falling
+                # back to this very page. /home is the most guessable URL in the
+                # app, so the dialog was reachable by typing rather than by any
+                # link. Found by /qa (ISSUE-010).
                 st.Page(home.render, title="Home", icon=":material/home:",
-                        url_path="home", default=True),
+                        default=True),
                 st.Page(dashboard.render, title="Dashboard",
                         icon=":material/bar_chart:", url_path="dashboard"),
             ],

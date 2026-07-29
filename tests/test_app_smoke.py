@@ -394,6 +394,28 @@ def test_preferences_survive_a_run_without_the_settings_widgets():
     assert "limit=11" in body, body
 
 
+# Regression: ISSUE-010 — the default page carried url_path="home", but Streamlit
+# serves whichever page is default=True at "/" and never registers its url_path.
+# So /home was dead config claiming a route the router did not know, and hitting
+# it produced Streamlit's "page does not seem to exist" dialog. /home is the most
+# guessable URL in the app, so the dialog was reachable by typing.
+# Found by /qa on 2026-07-29.
+# Report: .gstack/qa-reports/qa-report-localhost-8562-2026-07-29.md
+def test_default_page_declares_no_url_path():
+    from pathlib import Path
+
+    src = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+    # Find the st.Page(...) call carrying default=True and assert it has no
+    # url_path. Matching on the call text keeps this readable and specific.
+    calls = re.findall(r"st\.Page\((?:[^()]|\([^()]*\))*\)", src, re.DOTALL)
+    default_calls = [c for c in calls if "default=True" in c]
+    assert len(default_calls) == 1, f"expected exactly one default page, got {len(default_calls)}"
+    assert "url_path" not in default_calls[0], (
+        "the default page must not declare a url_path — Streamlit serves it at '/' "
+        "and never registers the path, so declaring one claims a route that 404s"
+    )
+
+
 def test_every_view_renders():
     """Each navigation destination renders without raising."""
     calls = {
