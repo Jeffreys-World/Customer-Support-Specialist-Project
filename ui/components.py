@@ -179,6 +179,21 @@ def ticket_row(ticket: Dict, key: str, open_label: str = "Open") -> bool:
 
 # --- Statistics rail ----------------------------------------------------------
 
+def count(value: object) -> str:
+    """Render a count with thousands separators, passing other values through.
+
+    Formatting lives here rather than at each call site so every statistic in the
+    console reads the same way. The queue routinely holds four-figure counts, and
+    the rails were rendering a bare "4433" beside the Dashboard's "8,469".
+    Non-integers (percentages, pre-formatted strings, em dashes) pass untouched.
+    """
+    if isinstance(value, bool):
+        return str(value)
+    if isinstance(value, int):
+        return f"{value:,}"
+    return str(value)
+
+
 def stat_block(head: str, period: str, items: Iterable[Tuple[str, object, str]]) -> None:
     """A statistics card: heading, period caption, then value/label pairs.
 
@@ -186,7 +201,7 @@ def stat_block(head: str, period: str, items: Iterable[Tuple[str, object, str]])
     statistics / This week" and "Satisfaction statistics / 60 days" cards.
     """
     cells = "".join(
-        f'<div><div class="tc-stat__value" style="color:{esc(color)}">{esc(value)}</div>'
+        f'<div><div class="tc-stat__value" style="color:{esc(color)}">{esc(count(value))}</div>'
         f'<div class="tc-stat__label">{esc(label)}</div></div>'
         for label, value, color in items
     )
@@ -396,6 +411,6 @@ def priority_bar(counts: Dict[str, int]) -> None:
         with col:
             st.html(
                 f'<div class="tc-stat"><div class="tc-stat__value" style="color:{tok.var_color}">'
-                f'{counts.get(cat.value, 0)}</div>'
+                f'{esc(count(counts.get(cat.value, 0)))}</div>'
                 f'<div class="tc-stat__label">{tok.emoji} {esc(tok.label)}</div></div>'
             )

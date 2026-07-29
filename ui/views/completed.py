@@ -21,7 +21,7 @@ def render() -> None:
     c.app_bar(
         "Completed work",
         "Priorities you've confirmed or adjusted in the last 30 days.",
-        chip=f"{len(rows)} reviewed",
+        chip=f"{c.count(len(rows))} reviewed",
     )
 
     if not rows:
@@ -48,7 +48,7 @@ def render() -> None:
     with right:
         with st.container(border=True):
             c.stat_block(
-                "Agreement statistics", f"{stats['total']} reviewed all time",
+                "Agreement statistics", f"{c.count(stats['total'])} reviewed all time",
                 [
                     ("Agreed", f"{stats['agreement_pct']}%", "var(--tc-low)"),
                     ("Overridden", stats["overridden"], "var(--tc-muted)"),

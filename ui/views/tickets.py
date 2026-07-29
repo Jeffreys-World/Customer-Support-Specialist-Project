@@ -55,13 +55,15 @@ def render_queue(
     filtered = _apply_sort(filtered, str(filters["sort"]))
 
     with header:
-        c.app_bar(title, subtitle, chip=f"{len(filtered)} in view")
+        c.app_bar(title, subtitle, chip=f"{len(filtered):,} in view")
 
     st.html("<div style='height:.35rem'></div>")
     left, right = st.columns([7, 3], gap="medium")
 
     with left:
-        c.section(f"{len(filtered)} tickets")
+        # Separators and singular/plural: the queue routinely holds four-figure
+        # counts, and a filter matching exactly one read "1 tickets".
+        c.section(f"{len(filtered):,} ticket{'' if len(filtered) == 1 else 's'}")
         if not filtered:
             # Empty queue is a state, not an exit. Returning here used to skip the
             # `with right:` block below, so an over-narrow filter collapsed the
@@ -78,7 +80,7 @@ def render_queue(
                     st.rerun()
 
             if shown < len(filtered):
-                st.caption(f"Showing {shown} of {len(filtered)}.")
+                st.caption(f"Showing {shown:,} of {len(filtered):,}.")
                 if st.button("Load more", key=f"{key_prefix}_more", use_container_width=True):
                     st.session_state[shown_key] = shown + PAGE_SIZE
                     st.rerun()
@@ -102,13 +104,13 @@ def _statistics_rail(tickets: List[Dict]) -> None:
                 ("Safety net", net, "var(--tc-primary)"),
             ],
         )
-        st.caption(f"{breached} past SLA target")
+        st.caption(f"{c.count(breached)} past SLA target")
 
     with st.container(border=True):
         stats = domain.agreement_stats()
         if stats["total"]:
             c.stat_block(
-                "Agreement statistics", f"{stats['total']} reviewed",
+                "Agreement statistics", f"{c.count(stats['total'])} reviewed",
                 [
                     ("Agreed with AI", f"{stats['agreement_pct']}%", "var(--tc-low)"),
                     ("Overridden", stats["overridden"], "var(--tc-muted)"),

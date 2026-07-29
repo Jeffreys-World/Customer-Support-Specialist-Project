@@ -70,10 +70,13 @@ def test_header_count_tracks_active_filter():
 
     def counts(app):
         body = _html(app)
-        chip = re.search(r'class="tc-chip">(\d+) in view<', body)
-        section = re.search(r'class="tc-section">(\d+) tickets<', body)
+        # Counts carry thousands separators and the heading is singular at 1, so
+        # the pattern must tolerate both (ISSUE-012).
+        chip = re.search(r'class="tc-chip">([\d,]+) in view<', body)
+        section = re.search(r'class="tc-section">([\d,]+) tickets?<', body)
         assert chip and section, "header chip / section count missing from render"
-        return int(chip.group(1)), int(section.group(1))
+        return (int(chip.group(1).replace(",", "")),
+                int(section.group(1).replace(",", "")))
 
     baseline_chip, baseline_section = counts(at)
     assert baseline_chip == baseline_section
@@ -414,6 +417,28 @@ def test_default_page_declares_no_url_path():
         "the default page must not declare a url_path — Streamlit serves it at '/' "
         "and never registers the path, so declaring one claims a route that 404s"
     )
+
+
+# Regression: ISSUE-012 — the queue rails rendered a bare "4433" next to the
+# Dashboard's "8,469", and a filter matching exactly one ticket read "1 tickets".
+# Found by /qa on 2026-07-29.
+def test_counts_are_formatted_and_pluralized():
+    from ui.components import count
+
+    assert count(8469) == "8,469"
+    assert count(0) == "0"
+    assert count(999) == "999"
+    # Percentages and pre-formatted strings must pass through untouched, or the
+    # stat rails would start printing "1,00%" style nonsense.
+    assert count("87%") == "87%"
+    assert count("—") == "—"
+    assert count(2.99) == "2.99"
+
+    at = AppTest.from_string(TICKETS_VIEW, default_timeout=90).run()
+    assert not at.exception, at.exception
+    body = _html(at)
+    assert "8,469 in view" in body, "chip should carry a thousands separator"
+    assert ">1 tickets<" not in body, "singular count must not read '1 tickets'"
 
 
 def test_every_view_renders():
