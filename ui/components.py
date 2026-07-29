@@ -52,9 +52,15 @@ def avatar_data_uri(initials: str, color: str) -> str:
 
 
 def priority_pill_html(category: str) -> str:
+    """A priority pill.
+
+    Uses the token's ``var(...)`` spellings, not its literal hex: inline hex
+    would survive a theme swap unchanged and leave every pill wearing light-mode
+    colours on a dark card.
+    """
     tok = priority(category)
     return (
-        f'<span class="tc-pill" style="background:{tok.tint};color:{tok.color}">'
+        f'<span class="tc-pill" style="background:{tok.var_tint};color:{tok.var_color}">'
         f'<span class="tc-pill__dot"></span>{esc(tok.label)}</span>'
     )
 
@@ -157,7 +163,7 @@ def ticket_row(ticket: Dict, key: str, open_label: str = "Open") -> bool:
                 + '<div class="tc-row__meta">'
                 + priority_pill_html(ticket["category"])
                 + status_pill_html()
-                + score_bar_html(ticket.get("score", 0), tok.color)
+                + score_bar_html(ticket.get("score", 0), tok.var_color)
                 + f'<span class="tc-row__sep">·</span><span>{esc(sla)}</span>'
                 + f'<span class="tc-row__sep">·</span><span>{esc(demo_context._ago(age))}</span>'
                 + f'<span class="tc-row__sep">·</span><span>#{esc(ticket["id"])}</span>'
@@ -229,19 +235,30 @@ def history_list(items: Iterable[demo_context.HistoryItem]) -> None:
 
 
 def requester_panel(ticket: Dict) -> None:
-    """Right-hand contact card. Entirely simulated — badged accordingly (D1)."""
+    """Right-hand contact card.
+
+    Badging is per-field rather than per-panel since the dataset swap. Name and
+    email are real dataset columns now, so stamping the whole panel "simulated"
+    would understate what the console actually knows. Phone, organisation, local
+    time and tenure have no source column and stay derived — those keep the badge
+    (D1).
+    """
     req = demo_context.requester_for(ticket)
-    panel_title("Requester", badge=True)
+    panel_title("Requester", badge=not req.identity_is_real)
     st.html(
         '<div class="tc-row" style="margin-bottom:.6rem">'
         + avatar_html(req.initials, req.avatar_color)
         + f'<div class="tc-row__body"><div class="tc-row__name">{esc(req.name)}</div>'
-        + f'<div class="tc-history__meta">{esc(req.org)}</div></div></div>'
+        + f'<div class="tc-history__meta">{esc(req.org)} {demo_badge_html()}</div></div></div>'
     )
     field("Email", req.email)
-    field("Phone", req.phone)
-    field("Local time", f"{req.local_time()} · {req.city}")
-    field("Notes", f"Valued customer since {req.customer_since}")
+    field("Phone", req.phone, value_html=f"{esc(req.phone)} {demo_badge_html()}")
+    field("Local time",
+          f"{req.local_time()} · {req.city}",
+          value_html=f"{esc(req.local_time())} · {esc(req.city)} {demo_badge_html()}")
+    field("Notes",
+          f"Valued customer since {req.customer_since}",
+          value_html=f"Valued customer since {esc(req.customer_since)} {demo_badge_html()}")
 
 
 def filter_row(key_prefix: str, show_queue: bool = True) -> Dict[str, object]:
@@ -275,8 +292,12 @@ def filter_row(key_prefix: str, show_queue: bool = True) -> Dict[str, object]:
             "Queue", queues_in_use(), default=None, key=f"{key_prefix}_queue",
             placeholder="Queue", label_visibility="collapsed",
         )
+    from ui.domain import SORT_OPTIONS
+    from ui.state import default_sort
+
     sort = cols[-1].selectbox(
-        "Sort", ["Recommended", "Oldest first", "Highest score"],
+        "Sort", SORT_OPTIONS,
+        index=SORT_OPTIONS.index(default_sort()),
         key=f"{key_prefix}_sort", label_visibility="collapsed",
     )
     return {"query": query, "categories": cats, "queues": queues, "sort": sort}
@@ -337,7 +358,7 @@ def priority_bar(counts: Dict[str, int]) -> None:
         tok = priority(cat)
         with col:
             st.html(
-                f'<div class="tc-stat"><div class="tc-stat__value" style="color:{tok.color}">'
+                f'<div class="tc-stat"><div class="tc-stat__value" style="color:{tok.var_color}">'
                 f'{counts.get(cat.value, 0)}</div>'
                 f'<div class="tc-stat__label">{tok.emoji} {esc(tok.label)}</div></div>'
             )

@@ -16,7 +16,16 @@ _ACTIVE = "active_ticket_id"     # which tab is focused
 _FOLLOWING = "following_ids"     # "Shared work → Following"
 _LAST_ACTION = "last_action"     # confirm/override toast text
 
+# Settings-page preferences. Public because the widgets in `ui.views.settings`
+# bind to these keys directly — Streamlit writes a widget's value into
+# session_state under its `key`, so the widget and the reader must agree on the
+# name. Reading through the helpers below keeps the default in one place.
+ATTENTION_LIMIT_KEY = "pref_attention_limit"
+DEFAULT_SORT_KEY = "pref_default_sort"
+
 MAX_TABS = 6  # Zendesk caps the visible tab strip too; past this the oldest closes
+
+DEFAULT_ATTENTION_LIMIT = 6
 
 
 def _init() -> None:
@@ -73,6 +82,19 @@ def toggle_following(ticket_id: str) -> bool:
         return False
     ids.add(ticket_id)
     return True
+
+
+def attention_limit() -> int:
+    """How many tickets Home's 'Needs attention now' list shows."""
+    return int(st.session_state.get(ATTENTION_LIMIT_KEY, DEFAULT_ATTENTION_LIMIT))
+
+
+def default_sort() -> str:
+    """Which sort the Tickets view opens with."""
+    from ui.domain import SORT_OPTIONS  # local import avoids a cycle at module load
+
+    value = st.session_state.get(DEFAULT_SORT_KEY, SORT_OPTIONS[0])
+    return value if value in SORT_OPTIONS else SORT_OPTIONS[0]
 
 
 def set_last_action(message: str) -> None:

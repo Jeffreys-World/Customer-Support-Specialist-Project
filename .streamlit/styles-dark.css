@@ -1,0 +1,144 @@
+/* ============================================================================
+   Triage console — dark theme overlay
+   ----------------------------------------------------------------------------
+   Appended after `styles.css` by `ui.theme.inject_css()` when dark mode is on.
+
+   HOW THIS WORKS — read before editing
+
+   This file adds no new rules for our own components. It re-declares the same
+   `:root` custom properties the base sheet defines, with dark values. Because it
+   is concatenated *after* the base sheet, and the selectors have identical
+   specificity, the later declaration wins and every `var(--tc-*)` in the console
+   resolves to the dark value. Adding a new colour to a component therefore needs
+   no change here at all, as long as the component references a variable.
+
+   Streamlit 1.39 has no runtime theming API and `config.toml` is read once at
+   server start, so the block at the bottom re-skins Streamlit's own shell — the
+   app background, widget surfaces, and text — which `config.toml` would
+   otherwise keep pinned to the light palette for the life of the process.
+
+   The navigation rail is deliberately NOT re-themed: it is already a dark teal
+   surface in both modes, which is what makes the light theme read as Zendesk.
+   ========================================================================== */
+
+:root {
+  /* Surfaces. Canvas is the workspace behind cards; surface is the card itself.
+     Both lift slightly from pure black so the card edges stay legible. */
+  --tc-surface: #1F2933;
+  --tc-canvas: #141A1F;
+  --tc-border: #2C3742;
+  --tc-border-strong: #3A4552;
+
+  --tc-text: #E4E9ED;
+  --tc-muted: #9AA5B1;
+
+  /* Primary lightens: #1F73B7 fails contrast against a #1F2933 card. */
+  --tc-primary: #4A9EE0;
+  --tc-primary-soft: #17304A;
+
+  /* Priority accents shift only enough to stay legible on a dark surface. A red
+     that means "critical" has to keep meaning it, so hue is preserved and only
+     lightness moves. */
+  --tc-critical: #F06E78;
+  --tc-high: #F0A94C;
+  --tc-medium: #E8CC5E;
+  --tc-low: #5CB88A;
+
+  /* Tints invert from near-white washes to low-alpha accent overlays. */
+  --tc-critical-tint: #3A2126;
+  --tc-high-tint: #3A2E1D;
+  --tc-medium-tint: #38331C;
+  --tc-low-tint: #1D3329;
+
+  --tc-open-tint: #1D3329;
+  --tc-open-text: #5CB88A;
+  --tc-demo-tint: #2A323B;
+  --tc-demo-text: #9AA5B1;
+
+  --tc-note-bg: #33291A;
+  --tc-note-border: #4D3D22;
+  --tc-note-head: #E8B96B;
+
+  --tc-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+/* ----------------------------------------------------------------------------
+   Streamlit's own shell. `config.toml` sets these once at server start, so they
+   have to be overridden here for a runtime swap. Same upgrade-sensitivity
+   warning as section 2 of the base sheet: these are internal testids.
+   -------------------------------------------------------------------------- */
+
+.stApp,
+[data-testid="stAppViewContainer"],
+[data-testid="stMain"] {
+  background: var(--tc-canvas);
+  color: var(--tc-text);
+}
+
+[data-testid="stMarkdown"],
+[data-testid="stMarkdownContainer"],
+[data-testid="stCaptionContainer"] {
+  color: var(--tc-text);
+}
+
+/* Cards. The base sheet already points these at --tc-surface; the border needs
+   restating because Streamlit sets it inline-ish at a higher specificity. */
+[data-testid="stVerticalBlockBorderWrapper"] {
+  background: var(--tc-surface);
+  border-color: var(--tc-border);
+}
+
+/* Widgets: inputs, selects, multiselects in the main workspace. The rail's own
+   widgets are handled by the base sheet and stay as they are. */
+[data-testid="stMain"] input,
+[data-testid="stMain"] textarea,
+[data-testid="stMain"] div[data-baseweb="select"] > div,
+[data-testid="stMain"] div[data-baseweb="input"] {
+  background: var(--tc-surface) !important;
+  border-color: var(--tc-border-strong) !important;
+  color: var(--tc-text) !important;
+}
+
+/* Popover and dropdown surfaces render in a portal at the document root, so they
+   are not inside stMain and need targeting directly. */
+div[data-baseweb="popover"] div[role="listbox"],
+div[data-baseweb="popover"] ul,
+[data-testid="stPopoverBody"] {
+  background: var(--tc-surface);
+  color: var(--tc-text);
+}
+
+[data-testid="stMain"] [data-testid="stButton"] button {
+  background: var(--tc-surface);
+  color: var(--tc-text);
+  border-color: var(--tc-border-strong);
+}
+[data-testid="stMain"] [data-testid="stButton"] button:hover {
+  border-color: var(--tc-primary);
+  color: var(--tc-primary);
+}
+
+/* Tabs and expanders. */
+[data-testid="stTabs"] button[role="tab"] {
+  color: var(--tc-muted);
+}
+[data-testid="stTabs"] button[role="tab"][aria-selected="true"] {
+  color: var(--tc-text);
+}
+[data-testid="stExpander"] details {
+  background: var(--tc-surface);
+  border-color: var(--tc-border);
+}
+
+/* Dataframes and tables. */
+[data-testid="stDataFrame"],
+[data-testid="stTable"] {
+  background: var(--tc-surface);
+  color: var(--tc-text);
+}
+
+/* Alerts keep their semantic hue but need a dark base to sit on. */
+[data-testid="stAlert"] {
+  background: var(--tc-surface);
+  color: var(--tc-text);
+}

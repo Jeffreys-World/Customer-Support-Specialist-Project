@@ -81,7 +81,14 @@ class _Digits:
 
 @dataclass(frozen=True)
 class Requester:
-    """Simulated identity for the requester panel. Never affects triage."""
+    """Identity for the requester panel. Never affects triage.
+
+    Partly real since the dataset swap: ``customer_support_tickets.csv`` carries
+    a genuine customer name and email per ticket, so those two fields are no
+    longer invented. ``identity_is_real`` records which way a given record went,
+    so the UI can badge precisely instead of blanket-labelling the whole panel
+    simulated when most of it isn't.
+    """
 
     name: str
     email: str
@@ -91,6 +98,7 @@ class Requester:
     utc_offset: int
     customer_since: int
     avatar_color: str
+    identity_is_real: bool = False
 
     @property
     def initials(self) -> str:
@@ -103,21 +111,32 @@ class Requester:
 
 
 def requester_for(ticket: Dict) -> Requester:
+    """Build the requester card, preferring real dataset identity where it exists.
+
+    Name and email come straight from the ticket when the dataset supplies them.
+    Phone, organisation, timezone, and tenure have no source column and are still
+    derived from the id hash — those are the only fields the panel badges.
+    """
     d = _Digits(ticket["id"])
     first = _FIRST[d.take(len(_FIRST))]
     last = _LAST[d.take(len(_LAST))]
     org = _ORGS[d.take(len(_ORGS))]
     city, offset = _ZONES[d.take(len(_ZONES))]
     domain = org.split()[0].lower()
+
+    real_name = str(ticket.get("requester_name") or "").strip()
+    real_email = str(ticket.get("requester_email") or "").strip()
+
     return Requester(
-        name=f"{first} {last}",
-        email=f"{first.lower()}.{last.lower()}@{domain}.example",
+        name=real_name or f"{first} {last}",
+        email=real_email or f"{first.lower()}.{last.lower()}@{domain}.example",
         phone=f"+1 ({200 + d.take(700)}) {100 + d.take(900):03d}-{d.take(10000):04d}",
         org=org,
         city=city,
         utc_offset=offset,
         customer_since=2016 + d.take(9),
         avatar_color=_AVATAR_COLORS[d.take(len(_AVATAR_COLORS))],
+        identity_is_real=bool(real_name and real_email),
     )
 
 

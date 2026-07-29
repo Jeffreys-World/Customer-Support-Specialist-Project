@@ -45,6 +45,25 @@
   --tc-medium: #EFC02D;
   --tc-low: #2E8B57;
 
+  /* Soft pill/chip backgrounds per priority. These are the values that have to
+     change for dark mode — the accents above stay put, because a red that means
+     "critical" should mean it in both themes. */
+  --tc-critical-tint: #FCEDEE;
+  --tc-high-tint: #FDF3E6;
+  --tc-medium-tint: #FDF8E6;
+  --tc-low-tint: #EAF4EE;
+
+  /* Status pill, demo badge, and the amber internal note. Previously hardcoded
+     at each use site, which meant dark mode could not reach them. */
+  --tc-open-tint: #EDF7ED;
+  --tc-open-text: #2E8B57;
+  --tc-demo-tint: #F1F1F4;
+  --tc-demo-text: #68737D;
+  --tc-note-bg: #FFF7E8;
+  --tc-note-border: #F5D9A8;
+  --tc-note-head: #AD5F00;
+  --tc-on-accent: #FFFFFF;
+
   --tc-radius: 8px;
   --tc-radius-sm: 6px;
   --tc-shadow: 0 1px 2px rgba(47, 57, 65, 0.08), 0 2px 8px rgba(47, 57, 65, 0.04);
@@ -245,7 +264,7 @@
   height: 32px;
   border-radius: 50%;
   background: var(--tc-primary);
-  color: #fff;
+  color: var(--tc-on-accent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -287,12 +306,12 @@
   flex: none;
 }
 .tc-pill--open {
-  background: #EDF7ED;
-  color: #2E8B57;
+  background: var(--tc-open-tint);
+  color: var(--tc-open-text);
 }
 .tc-pill--demo {
-  background: #F1F1F4;
-  color: #68737D;
+  background: var(--tc-demo-tint);
+  color: var(--tc-demo-text);
   font-weight: 600;
   text-transform: uppercase;
   font-size: 0.62rem;
@@ -327,7 +346,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--tc-on-accent);
   font-size: 0.75rem;
   font-weight: 700;
 }
@@ -458,8 +477,8 @@
 
 /* Internal note — Zendesk's amber block. Ours carries the AI rationale. */
 .tc-note {
-  background: #FFF7E8;
-  border: 1px solid #F5D9A8;
+  background: var(--tc-note-bg);
+  border: 1px solid var(--tc-note-border);
   border-left: 3px solid var(--tc-high);
   border-radius: var(--tc-radius-sm);
   padding: 0.7rem 0.85rem;
@@ -468,7 +487,7 @@
 .tc-note__head {
   font-size: 0.72rem;
   font-weight: 700;
-  color: #AD5F00;
+  color: var(--tc-note-head);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 0.35rem;

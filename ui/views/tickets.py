@@ -97,9 +97,9 @@ def _statistics_rail(tickets: List[Dict]) -> None:
         c.stat_block(
             "Triage statistics", "Tickets in view",
             [
-                ("Critical", counts["Critical"], "#CC3340"),
-                ("High", counts["High"], "#ED8F1C"),
-                ("Safety net", net, "#1F73B7"),
+                ("Critical", counts["Critical"], "var(--tc-critical)"),
+                ("High", counts["High"], "var(--tc-high)"),
+                ("Safety net", net, "var(--tc-primary)"),
             ],
         )
         st.caption(f"{breached} past SLA target")
@@ -110,12 +110,12 @@ def _statistics_rail(tickets: List[Dict]) -> None:
             c.stat_block(
                 "Agreement statistics", f"{stats['total']} reviewed",
                 [
-                    ("Agreed with AI", f"{stats['agreement_pct']}%", "#2E8B57"),
-                    ("Overridden", stats["overridden"], "#68737D"),
+                    ("Agreed with AI", f"{stats['agreement_pct']}%", "var(--tc-low)"),
+                    ("Overridden", stats["overridden"], "var(--tc-muted)"),
                 ],
             )
         else:
-            c.stat_block("Agreement statistics", "No reviews yet", [("Reviewed", 0, "#68737D")])
+            c.stat_block("Agreement statistics", "No reviews yet", [("Reviewed", 0, "var(--tc-muted)")])
             st.caption("Confirm or override a ticket to start building this.")
 
 

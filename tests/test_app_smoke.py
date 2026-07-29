@@ -214,6 +214,50 @@ def test_ticket_row_has_no_literal_separator_text():
     )
 
 
+# Dark mode is implemented by appending a second stylesheet that re-declares the
+# :root custom properties, because Streamlit 1.39 has no runtime theming API and
+# does not execute <script> passed through st.markdown. These two tests pin both
+# halves of that mechanism: the swap happens, and the components are actually
+# reachable by it.
+def test_dark_mode_appends_the_dark_stylesheet():
+    script = (
+        "from ui import theme\n"
+        "theme.inject_css()\n"
+        "from ui.views import settings\n"
+        "settings.render()\n"
+    )
+    at = AppTest.from_string(script, default_timeout=90).run()
+    assert not at.exception, at.exception
+
+    light_css = "\n".join(m.body for m in at.markdown)
+    assert "--tc-canvas: #141A1F" not in light_css, "dark overrides leaked into light mode"
+
+    at.toggle[0].set_value(True).run()
+    assert not at.exception, at.exception
+    dark_css = "\n".join(m.body for m in at.markdown)
+    assert "--tc-canvas: #141A1F" in dark_css, "dark stylesheet was not appended"
+    # Streamlit's own shell must be re-skinned too; config.toml is read once at
+    # server start and would otherwise keep the app background light.
+    assert '[data-testid="stAppViewContainer"]' in dark_css
+
+
+def test_priority_markup_uses_css_variables_not_literal_hex():
+    """Inline hex would survive a theme swap and leave pills light on a dark card."""
+    from ui.components import priority_pill_html, score_bar_html
+    from ui.theme import priority
+
+    pill = priority_pill_html("Critical")
+    assert "var(--tc-critical)" in pill and "var(--tc-critical-tint)" in pill
+    assert "#CC3340" not in pill and "#FCEDEE" not in pill
+
+    bar = score_bar_html(90, priority("Critical").var_color)
+    assert "var(--tc-critical)" in bar
+
+    # The literal values still exist on the token, because Altair renders to SVG
+    # through a Vega-Lite spec and cannot resolve a CSS variable.
+    assert priority("Critical").color == "#CC3340"
+
+
 def test_every_view_renders():
     """Each navigation destination renders without raising."""
     calls = {

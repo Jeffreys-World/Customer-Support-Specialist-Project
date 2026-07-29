@@ -50,8 +50,8 @@ def render() -> None:
             c.stat_block(
                 "Agreement statistics", f"{stats['total']} reviewed all time",
                 [
-                    ("Agreed", f"{stats['agreement_pct']}%", "#2E8B57"),
-                    ("Overridden", stats["overridden"], "#68737D"),
+                    ("Agreed", f"{stats['agreement_pct']}%", "var(--tc-low)"),
+                    ("Overridden", stats["overridden"], "var(--tc-muted)"),
                 ],
             )
             st.caption(

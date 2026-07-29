@@ -13,8 +13,6 @@ import streamlit as st
 from ui import components as c
 from ui import domain, state
 
-ATTENTION_LIMIT = 6
-
 
 def render() -> None:
     tickets = domain.load_tickets()
@@ -46,7 +44,7 @@ def render() -> None:
             [t for t in tickets if t["category"] in ("Critical", "High")
              or t.get("safety_net_triggered")],
             key=domain.sort_key,
-        )[:ATTENTION_LIMIT]
+        )[:state.attention_limit()]
 
         if not urgent:
             c.empty_state("Nothing urgent in the queue. That's a good morning.")
@@ -71,9 +69,9 @@ def _statistics(tickets, counts) -> None:
         c.stat_block(
             "Triage statistics", "This queue",
             [
-                ("Critical", counts["Critical"], "#CC3340"),
-                ("High", counts["High"], "#ED8F1C"),
-                ("Past SLA", breached, "#68737D"),
+                ("Critical", counts["Critical"], "var(--tc-critical)"),
+                ("High", counts["High"], "var(--tc-high)"),
+                ("Past SLA", breached, "var(--tc-muted)"),
             ],
         )
         st.caption(f"{net} escalated by the Critical-class safety net.")
@@ -84,13 +82,14 @@ def _statistics(tickets, counts) -> None:
             c.stat_block(
                 "Agreement statistics", f"{stats['total']} reviewed",
                 [
-                    ("Agreed with AI", f"{stats['agreement_pct']}%", "#2E8B57"),
-                    ("Overridden", stats["overridden"], "#68737D"),
+                    ("Agreed with AI", f"{stats['agreement_pct']}%", "var(--tc-low)"),
+                    ("Overridden", stats["overridden"], "var(--tc-muted)"),
                 ],
             )
             st.caption("How often you kept the AI's priority. The agent always has final say.")
         else:
-            c.stat_block("Agreement statistics", "No reviews yet", [("Reviewed", 0, "#68737D")])
+            c.stat_block("Agreement statistics", "No reviews yet",
+                         [("Reviewed", 0, "var(--tc-muted)")])
             st.caption("Confirm or override a ticket to start building this.")
 
     with st.container(border=True):

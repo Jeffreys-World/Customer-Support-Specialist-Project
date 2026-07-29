@@ -48,6 +48,10 @@ SLA_HOURS: Dict[Category, int] = {
 # a copy before the console was split into this package.)
 QUEUE_OPTIONS = LLM_QUEUE_OPTIONS
 
+# Queue sort vocabulary. Lives here rather than as a literal in the filter row so
+# the Settings page can offer the same list as a default without the two drifting.
+SORT_OPTIONS: List[str] = ["Recommended", "Oldest first", "Highest score"]
+
 
 # --- Loading ------------------------------------------------------------------
 
