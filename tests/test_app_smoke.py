@@ -171,7 +171,7 @@ def test_every_offered_queue_filter_matches_at_least_one_ticket():
 # Found by /qa on 2026-07-28.
 # Report: .gstack/qa-reports/qa-report-localhost-8501-2026-07-28.md
 def test_embedded_report_headings_are_demoted():
-    from ui.views.reporting import demote_headings
+    from ui.views.dashboard import demote_headings
 
     src = "# Title\ntext\n## Section\n### Sub\n"
     out = demote_headings(src).splitlines()
@@ -184,7 +184,7 @@ def test_embedded_report_headings_are_demoted():
 
 def test_demote_headings_skips_fenced_code():
     """A `#` comment in a shell example is not a heading."""
-    from ui.views.reporting import demote_headings
+    from ui.views.dashboard import demote_headings
 
     src = "# Real heading\n\n```bash\n# just a comment\necho hi\n```\n"
     out = demote_headings(src)
@@ -193,7 +193,7 @@ def test_demote_headings_skips_fenced_code():
 
 
 def test_demote_headings_caps_at_h6():
-    from ui.views.reporting import demote_headings
+    from ui.views.dashboard import demote_headings
 
     assert demote_headings("##### Deep").startswith("######")
     assert "#######" not in demote_headings("##### Deep")
@@ -222,10 +222,10 @@ def test_every_view_renders():
         "safety_net": "tickets.render_safety_net()",
         "following": "following.render()",
         "completed": "completed.render()",
-        "reporting": "reporting.render()",
+        "dashboard": "dashboard.render()",
         "settings": "settings.render()",
     }
-    imports = "from ui.views import home, tickets, following, completed, reporting, settings\n"
+    imports = "from ui.views import home, tickets, following, completed, dashboard, settings\n"
     for name, call in calls.items():
         at = AppTest.from_string(imports + call, default_timeout=90).run()
         assert not at.exception, f"{name} raised: {at.exception}"

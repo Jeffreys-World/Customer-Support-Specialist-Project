@@ -9,11 +9,11 @@ layer in ``ui/domain.py``.
 
 Navigation mirrors a support agent's day rather than the codebase's structure:
 
-    Home                     what needs me right now
+    Home · Dashboard         what needs me right now · how the queue is doing
     Your work                Tickets · Safety-net escalations
     Shared work              Following
     Completed work           Last 30 days
-    Insights                 Reporting · Settings
+    Account                  Settings (+ the profile menu at the rail's foot)
 
 Run:  ``streamlit run app.py``
 """
@@ -22,8 +22,9 @@ from __future__ import annotations
 
 import streamlit as st
 
+from ui import components as c
 from ui import domain, theme
-from ui.views import completed, following, home, reporting, settings, tickets
+from ui.views import completed, dashboard, following, home, settings, tickets
 
 
 def _no_data_screen() -> None:
@@ -73,11 +74,22 @@ def main() -> None:
     # Home reaches for this when the agent opens a ticket from the attention list.
     st.session_state["_page_tickets"] = tickets_page
 
+    settings_page = st.Page(settings.render, title="Settings",
+                            icon=":material/settings:", url_path="settings")
+    # The profile menu's "Account settings" entry routes here.
+    st.session_state["_page_settings"] = settings_page
+
     nav = st.navigation(
         {
+            # Home and Dashboard are both top-level destinations: one answers
+            # "what needs me right now", the other "how is the queue doing".
+            # Dashboard used to sit under an "Insights" group as "Reporting",
+            # which buried the only analytics surface in the product.
             "": [
                 st.Page(home.render, title="Home", icon=":material/home:",
                         url_path="home", default=True),
+                st.Page(dashboard.render, title="Dashboard",
+                        icon=":material/bar_chart:", url_path="dashboard"),
             ],
             "Your work": [
                 tickets_page,
@@ -92,14 +104,15 @@ def main() -> None:
                 st.Page(completed.render, title="Last 30 days",
                         icon=":material/task_alt:", url_path="completed"),
             ],
-            "Insights": [
-                st.Page(reporting.render, title="Reporting",
-                        icon=":material/bar_chart:", url_path="reporting"),
-                st.Page(settings.render, title="Settings",
-                        icon=":material/settings:", url_path="settings"),
-            ],
+            "Account": [settings_page],
         }
     )
+
+    # The profile menu lives at the foot of the rail, below every destination —
+    # the same place the reference puts it, and it must render before nav.run()
+    # so it is present on every page rather than only the default one.
+    c.profile_menu()
+
     nav.run()
 
 

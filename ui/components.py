@@ -282,6 +282,54 @@ def filter_row(key_prefix: str, show_queue: bool = True) -> Dict[str, object]:
     return {"query": query, "categories": cats, "queues": queues, "sort": sort}
 
 
+def profile_menu(name: str = "Jordan Rivera", role: str = "Support Specialist",
+                 initials: str = "JR") -> None:
+    """The rail-foot profile menu: avatar, name, and a quick-access dropdown.
+
+    Built on ``st.popover`` because Streamlit has no native menu widget and the
+    reference's profile control is a click-to-open list, not a select box.
+
+    On what these entries do: this is a portfolio console with no auth layer, no
+    mail path, and one hard-coded agent. Rather than ship four dead links styled
+    to look live, each entry either routes somewhere real (Account settings →
+    the Settings page) or says plainly that it is inert. That is the same
+    standard `docs/UI_SPEC.md` already holds the composer and the macro button
+    to — a control that lies about being wired up is worse than an absent one.
+    """
+    with st.sidebar:
+        st.html('<div class="tc-profile__rule"></div>')
+        with st.popover(f"👤  {name}", use_container_width=True):
+            st.html(
+                '<div class="tc-row" style="margin-bottom:.5rem">'
+                + avatar_html(initials, Color.PRIMARY)
+                + f'<div class="tc-row__body"><div class="tc-row__name">{esc(name)}</div>'
+                + f'<div class="tc-history__meta">{esc(role)}</div></div></div>'
+            )
+            st.caption("Signed in as the demo agent.")
+
+            if st.button("View profile", key="pm_profile", use_container_width=True):
+                st.session_state["_profile_notice"] = (
+                    "View profile is not implemented — this console has a single "
+                    "hard-coded agent and no user directory behind it."
+                )
+            if st.button("Account settings", key="pm_settings", use_container_width=True):
+                st.switch_page(st.session_state["_page_settings"])
+            if st.button("Help & support", key="pm_help", use_container_width=True):
+                st.session_state["_profile_notice"] = (
+                    "Help & support is not implemented — there is no help centre "
+                    "behind this build. The README covers how the console works."
+                )
+            if st.button("Log out", key="pm_logout", use_container_width=True):
+                st.session_state["_profile_notice"] = (
+                    "Log out is not implemented — the console has no auth layer, "
+                    "so there is no session to end."
+                )
+
+            notice = st.session_state.get("_profile_notice")
+            if notice:
+                st.caption(notice)
+
+
 def priority_bar(counts: Dict[str, int]) -> None:
     """Four-up priority KPI row, always showing all four levels even at zero."""
     cols = st.columns(4)

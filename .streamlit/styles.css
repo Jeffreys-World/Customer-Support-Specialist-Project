@@ -90,9 +90,16 @@
 [data-testid="stSidebar"] [data-testid="stLogo"] {
   filter: none;
 }
+/* Product mark, top-left of the rail. `st.logo(size="large")` caps at roughly
+   2rem, which left the brand smaller than the nav labels beneath it. The lockup
+   is 188x48 (3.9:1), so 2.9rem renders ~182px wide and still clears the 268px
+   rail's 2rem of horizontal padding. Height alone is set; width follows the
+   SVG's own aspect ratio rather than being forced. */
 [data-testid="stSidebar"] [data-testid="stLogo"] {
-  height: 2rem;
-  margin-bottom: 0.25rem;
+  height: 2.9rem;
+  width: auto;
+  max-width: 100%;
+  margin-bottom: 0.55rem;
 }
 
 /* Nav section headings ("Your work", "Shared work", "Completed work"). */
@@ -504,4 +511,24 @@
   color: var(--tc-muted);
   font-family: var(--tc-font);
   font-size: 0.87rem;
+}
+
+/* --- Profile menu at the foot of the rail --------------------------------- */
+.tc-profile__rule {
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  margin: 0.5rem 0 0.6rem;
+}
+/* The popover trigger is a button in the rail, so it needs dark-surface
+   treatment rather than the light workspace button styling. */
+[data-testid="stSidebar"] [data-testid="stPopover"] button {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: var(--tc-rail-text);
+  justify-content: flex-start;
+  font-weight: 600;
+}
+[data-testid="stSidebar"] [data-testid="stPopover"] button:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #FFFFFF;
 }

@@ -1,8 +1,12 @@
-"""Reporting — the measured results, surfaced in the product.
+"""Dashboard — ticket analytics, and the measured model results beneath them.
 
-The evaluation numbers already exist in ``results/evaluation.md`` (produced by
-``python -m src.evaluate``). Rendering them here rather than restating them means
-the console can never drift from the committed report.
+Renamed from "Reporting". The old page was only an embedded copy of
+``results/evaluation.md``; this one leads with the queue analytics an agent
+actually opens a dashboard to see, and keeps the evaluation report below them.
+
+The evaluation numbers are still rendered from ``results/evaluation.md``
+(produced by ``python -m src.evaluate``) rather than restated, so the console can
+never drift from the committed report.
 """
 
 from __future__ import annotations
@@ -48,8 +52,8 @@ def render() -> None:
     counts = domain.category_counts(tickets)
 
     c.app_bar(
-        "Reporting",
-        "How the scorer performs against the dataset's own labels.",
+        "Dashboard",
+        "Queue composition, and how the scorer performs against the dataset's labels.",
         chip=f"{len(tickets)} tickets classified",
     )
 
