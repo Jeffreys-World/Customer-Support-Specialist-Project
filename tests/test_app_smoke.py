@@ -330,6 +330,70 @@ def test_dashboard_renders_kpis_and_integrity_panel():
     assert "resolution time" in body.lower(), "the omission must be explained, not silent"
 
 
+# Regression: ISSUE-009 — the Settings "Preferences" controls did nothing.
+# Both widgets bound their `key` directly to the preference key. Streamlit
+# garbage-collects session_state entries whose widget was not rendered in the
+# current script run, and these widgets only exist on the Settings page, so the
+# value was discarded the moment the agent navigated away: the preference never
+# reached Home or Tickets, and returning to Settings showed it reset. The
+# selectbox did not even hold its value on Settings itself.
+# Found by /qa on 2026-07-29 via click-through navigation in a browser.
+# Report: .gstack/qa-reports/qa-report-localhost-8562-2026-07-29.md
+def test_preference_keys_are_not_widget_keys():
+    """The durable key must never be a widget key, or Streamlit will collect it."""
+    from pathlib import Path
+
+    from ui import state
+
+    assert state.ATTENTION_LIMIT_KEY != state.W_ATTENTION_LIMIT
+    assert state.DEFAULT_SORT_KEY != state.W_DEFAULT_SORT
+    # The widget keys are the ones bound in ui/views/settings.py. If a future edit
+    # rebinds a widget to the durable key, this pairing check is what catches it.
+    settings_src = (
+        Path(__file__).resolve().parents[1] / "ui" / "views" / "settings.py"
+    ).read_text(encoding="utf-8")
+    assert "key=state.W_ATTENTION_LIMIT" in settings_src
+    assert "key=state.W_DEFAULT_SORT" in settings_src
+    assert "key=state.ATTENTION_LIMIT_KEY" not in settings_src
+    assert "key=state.DEFAULT_SORT_KEY" not in settings_src
+
+
+def test_persist_callbacks_copy_widget_value_to_durable_key():
+    from ui import state
+
+    script = (
+        "import streamlit as st\n"
+        "from ui import state\n"
+        "st.session_state[state.W_ATTENTION_LIMIT] = 12\n"
+        "state.persist_attention_limit()\n"
+        "st.session_state[state.W_DEFAULT_SORT] = 'Highest score'\n"
+        "state.persist_default_sort()\n"
+        "st.write(f'limit={state.attention_limit()} sort={state.default_sort()}')\n"
+    )
+    at = AppTest.from_string(script, default_timeout=60).run()
+    assert not at.exception, at.exception
+    assert at.session_state[state.ATTENTION_LIMIT_KEY] == 12
+    assert at.session_state[state.DEFAULT_SORT_KEY] == "Highest score"
+    body = "\n".join(str(m.value) for m in at.markdown)
+    assert "limit=12 sort=Highest score" in body, body
+
+
+def test_preferences_survive_a_run_without_the_settings_widgets():
+    """The real failure mode: read the preference on a page that has no widget."""
+    script = (
+        "import streamlit as st\n"
+        "from ui import state\n"
+        "# Simulate Settings having run earlier and persisted the choice...\n"
+        "st.session_state.setdefault(state.ATTENTION_LIMIT_KEY, 11)\n"
+        "# ...then a page that renders no Settings widget at all reads it.\n"
+        "st.write(f'limit={state.attention_limit()}')\n"
+    )
+    at = AppTest.from_string(script, default_timeout=60).run()
+    assert not at.exception, at.exception
+    body = "\n".join(str(m.value) for m in at.markdown)
+    assert "limit=11" in body, body
+
+
 def test_every_view_renders():
     """Each navigation destination renders without raising."""
     calls = {

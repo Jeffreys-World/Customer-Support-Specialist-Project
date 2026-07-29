@@ -16,12 +16,22 @@ _ACTIVE = "active_ticket_id"     # which tab is focused
 _FOLLOWING = "following_ids"     # "Shared work → Following"
 _LAST_ACTION = "last_action"     # confirm/override toast text
 
-# Settings-page preferences. Public because the widgets in `ui.views.settings`
-# bind to these keys directly — Streamlit writes a widget's value into
-# session_state under its `key`, so the widget and the reader must agree on the
-# name. Reading through the helpers below keeps the default in one place.
+# Settings-page preferences.
+#
+# Each preference has TWO keys, and the split is load-bearing. Streamlit garbage-
+# collects session_state entries whose widget was not rendered during the current
+# script run. The Settings widgets only exist on the Settings page, so binding a
+# widget's `key` directly to the preference meant the value was discarded the
+# moment the agent navigated anywhere else: the preference never reached Home or
+# Tickets, and returning to Settings showed it reset to the default. Found by /qa
+# (ISSUE-009) — every unit test passed, because none of them navigated.
+#
+# So the widget owns the `_W_*` key, and an on_change callback copies its value
+# into the durable `*_KEY`. A key that is never a widget key is never collected.
 ATTENTION_LIMIT_KEY = "pref_attention_limit"
 DEFAULT_SORT_KEY = "pref_default_sort"
+W_ATTENTION_LIMIT = "_w_attention_limit"
+W_DEFAULT_SORT = "_w_default_sort"
 
 MAX_TABS = 6  # Zendesk caps the visible tab strip too; past this the oldest closes
 
@@ -95,6 +105,18 @@ def default_sort() -> str:
 
     value = st.session_state.get(DEFAULT_SORT_KEY, SORT_OPTIONS[0])
     return value if value in SORT_OPTIONS else SORT_OPTIONS[0]
+
+
+def persist_attention_limit() -> None:
+    """Copy the Settings slider's value into the durable key. See the key block."""
+    if W_ATTENTION_LIMIT in st.session_state:
+        st.session_state[ATTENTION_LIMIT_KEY] = int(st.session_state[W_ATTENTION_LIMIT])
+
+
+def persist_default_sort() -> None:
+    """Copy the Settings selectbox's value into the durable key. See the key block."""
+    if W_DEFAULT_SORT in st.session_state:
+        st.session_state[DEFAULT_SORT_KEY] = st.session_state[W_DEFAULT_SORT]
 
 
 def set_last_action(message: str) -> None:

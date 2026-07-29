@@ -127,19 +127,37 @@ def _preferences() -> None:
     with st.container(border=True):
         c.panel_title("Preferences")
 
+        # The widget writes to its own `_w_*` key and an on_change callback copies
+        # the value to the durable preference key. Binding the widget straight to
+        # the preference key looked correct and silently did nothing: Streamlit
+        # collects widget state for widgets absent from the current script run, so
+        # the value vanished on navigation and never reached Home or Tickets.
+        # See the key block in `ui/state.py` (ISSUE-009).
         st.slider(
             "Tickets shown on Home", min_value=3, max_value=15,
-            value=state.attention_limit(), key=state.ATTENTION_LIMIT_KEY,
+            value=state.attention_limit(), key=state.W_ATTENTION_LIMIT,
+            on_change=state.persist_attention_limit,
             help="How many tickets the Home 'Needs attention now' list shows.",
         )
         st.selectbox(
             "Default queue sort",
             domain.SORT_OPTIONS,
             index=domain.SORT_OPTIONS.index(state.default_sort()),
-            key=state.DEFAULT_SORT_KEY,
+            key=state.W_DEFAULT_SORT,
+            on_change=state.persist_default_sort,
             help="Which sort the Tickets view opens with.",
         )
-        st.caption("Both apply immediately and persist for this session.")
+        st.caption(
+            "Both apply immediately and last for this session. The queue sort "
+            "sets what Tickets opens with; the queue's own Sort control still "
+            "overrides it per-visit."
+        )
+        st.caption(
+            "A full page reload starts a new Streamlit session and returns these "
+            "to their defaults. Dark mode survives a reload because it is mirrored "
+            "into the URL; these are not, since a shared link carrying someone "
+            "else's list length would be surprising rather than useful."
+        )
 
 
 # --- Data ---------------------------------------------------------------------
