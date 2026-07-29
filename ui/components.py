@@ -251,7 +251,19 @@ def requester_panel(ticket: Dict) -> None:
         + f'<div class="tc-row__body"><div class="tc-row__name">{esc(req.name)}</div>'
         + f'<div class="tc-history__meta">{esc(req.org)} {demo_badge_html()}</div></div></div>'
     )
+    # Name and email are both real dataset columns, but the dataset generated them
+    # independently: only 1.0% of the 8,469 rows have an email whose local part
+    # relates to the customer's name. So the card legitimately shows
+    # "Gregory Bautista / johnstonbeth@example.com", which reads as a rendering
+    # bug unless it is called out. Labelled rather than hidden, and rather than
+    # substituting a tidy derived address, because the value itself is real —
+    # it is the pairing that carries no meaning. Found by /qa (ISSUE-011).
     field("Email", req.email)
+    if req.identity_is_real:
+        st.caption(
+            "Name and email are both real dataset fields, but this dataset pairs "
+            "them at random — they are not the same person's details."
+        )
     field("Phone", req.phone, value_html=f"{esc(req.phone)} {demo_badge_html()}")
     field("Local time",
           f"{req.local_time()} · {req.city}",

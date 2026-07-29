@@ -211,6 +211,12 @@ def _real_data() -> None:
             "dataset had no requester identity, status, channel, or CSAT column, "
             "so those panels were simulated."
         )
+        st.caption(
+            "⚠️ Real individually, not as a pair: only 1.0% of rows have an email "
+            "whose local part relates to the customer name, so a ticket can show "
+            "a real name beside a real but unrelated address. The requester panel "
+            "says so where it shows them."
+        )
 
 
 def _simulated_data() -> None:
