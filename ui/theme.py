@@ -34,8 +34,10 @@ DARK_CSS_PATH = REPO_ROOT / ".streamlit" / "styles-dark.css"
 LOGO_PATH = REPO_ROOT / "docs" / "assets" / "logo.svg"
 LOGO_MARK_PATH = REPO_ROOT / "docs" / "assets" / "logo-mark.svg"
 
-# Session-state key backing the Settings dark-mode toggle.
+# Session-state key backing the Settings dark-mode toggle, and the query
+# parameter it mirrors into. See :func:`is_dark` for why both exist.
 _THEME_KEY = "ui_theme"
+_THEME_PARAM = "theme"
 
 
 # --- Palette ------------------------------------------------------------------
@@ -129,13 +131,31 @@ def priority(category: Union[Category, str]) -> PriorityToken:
 # --- Theme state --------------------------------------------------------------
 
 def is_dark() -> bool:
-    """Is the console currently in dark mode? Session-scoped."""
-    return st.session_state.get(_THEME_KEY, "light") == "dark"
+    """Is the console currently in dark mode?
+
+    Session state is the live answer, with the URL as the fallback. Both are
+    needed: clicking between pages keeps one Streamlit session alive, so session
+    state carries the theme, but a browser refresh or an opened deep link starts
+    a *new* session with empty state. Without the query-parameter fallback, a
+    reload silently dropped the user back into light mode — found by loading
+    /dashboard directly after switching the theme on /settings.
+    """
+    if _THEME_KEY in st.session_state:
+        return st.session_state[_THEME_KEY] == "dark"
+    return st.query_params.get(_THEME_PARAM) == "dark"
 
 
 def set_dark(enabled: bool) -> None:
-    """Set the theme. Backs the Settings toggle."""
+    """Set the theme. Backs the Settings toggle.
+
+    Mirrors into the query string so the choice survives a reload and travels
+    with a copied URL.
+    """
     st.session_state[_THEME_KEY] = "dark" if enabled else "light"
+    if enabled:
+        st.query_params[_THEME_PARAM] = "dark"
+    elif _THEME_PARAM in st.query_params:
+        del st.query_params[_THEME_PARAM]
 
 
 # --- Stylesheet ---------------------------------------------------------------

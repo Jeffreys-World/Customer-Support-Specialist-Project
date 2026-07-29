@@ -190,6 +190,14 @@
   border-radius: var(--tc-radius);
   border-color: var(--tc-border);
 }
+/* ...but not in the rail. Streamlit wraps the profile popover in the same
+   border wrapper, so the unscoped rule above painted a white card behind the
+   rail's light-on-dark text and made the trigger unreadable. The rail is a dark
+   surface in both themes and its own children carry their styling. */
+[data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"] {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.14);
+}
 
 /* Buttons — scoped through the stable wrapper testid, never the inner one. */
 [data-testid="stButton"] button {

@@ -283,6 +283,40 @@ def test_dashboard_integrity_panel_is_computed_from_the_batch():
     assert 0 < facts["csat"]["coverage"] < 1, "CSAT should cover only closed tickets"
 
 
+# Regression: the Dashboard crashed with
+#   AttributeError: 'NoneType' object has no attribute 'notna'
+# against a batch generated before the dataset swap. `frame.get(missing)` returns
+# None, and `pd.to_datetime(None)` returns None rather than an empty Series, so
+# the timestamp check blew up and took the whole page with it. Found by loading
+# the running app in a browser — every unit test passed, because they all ran
+# against a current batch.
+def test_dashboard_survives_a_pre_swap_batch(monkeypatch):
+    from ui import domain
+
+    old_style = [
+        {"id": "T1", "subject": "Login broken", "body": "b", "category": "High",
+         "true_priority": "high", "score": 70, "tags": []},
+        {"id": "T2", "subject": "Invoice query", "body": "b", "category": "Low",
+         "true_priority": "low", "score": 20, "tags": []},
+    ]
+    monkeypatch.setattr(domain, "load_tickets", lambda: old_style)
+    domain.tickets_frame.clear()
+
+    try:
+        frame = domain.tickets_frame()
+        # Analytics columns are guaranteed present so chart code can index them.
+        for column in domain.ANALYTICS_COLUMNS:
+            assert column in frame.columns
+
+        facts = domain.data_integrity()          # must not raise
+        assert facts["timestamp_pairs"] == 0
+        assert facts["timestamp_inverted_rate"] == 0.0
+        assert domain.count_by("channel") == {}   # no data, not a crash
+        assert domain.csat_summary()["rated"] == 0
+    finally:
+        domain.tickets_frame.clear()
+
+
 def test_dashboard_renders_kpis_and_integrity_panel():
     at = AppTest.from_string(
         "from ui.views import dashboard\ndashboard.render()\n", default_timeout=180

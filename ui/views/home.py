@@ -21,7 +21,7 @@ def render() -> None:
     c.app_bar(
         "Home",
         "Your queue arrived pre-sorted. Start at the top.",
-        chip=f"{len(tickets)} tickets in queue",
+        chip=f"{len(tickets):,} tickets in queue",
     )
 
     toast = state.pop_last_action()
@@ -55,7 +55,7 @@ def render() -> None:
 
         breached = sum(1 for t in tickets if domain.sla_breached(t))
         if breached:
-            st.caption(f"{breached} ticket(s) in the full queue are past their SLA target.")
+            st.caption(f"{breached:,} ticket(s) in the full queue are past their SLA target.")
 
     with right:
         _statistics(tickets, counts)

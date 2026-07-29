@@ -143,6 +143,18 @@ def filter_tickets(
 
 # --- Dashboard analytics ------------------------------------------------------
 
+# Columns the Dashboard reads. A batch generated before the dataset swap has
+# none of them, so the frame guarantees they exist rather than making every call
+# site defend itself — `frame.get(missing)` returns None, and passing None into
+# `pd.to_datetime` yields None rather than an empty Series, which then blows up
+# on `.notna()`. Guaranteeing the columns once is the fix; see
+# `test_dashboard_survives_a_pre_swap_batch`.
+ANALYTICS_COLUMNS = [
+    "subject", "true_priority", "status", "channel", "product", "ticket_type",
+    "csat", "first_response_at", "resolved_at", "purchase_date",
+]
+
+
 @st.cache_data
 def tickets_frame() -> "pd.DataFrame":
     """The loaded batch as a DataFrame, for the Dashboard's charts.
@@ -150,14 +162,23 @@ def tickets_frame() -> "pd.DataFrame":
     Kept out of the queue path deliberately: the ticket list and detail views
     work on plain dicts and must stay free of a pandas import on the hot path.
     Only the Dashboard pays for this, and it is cached.
+
+    Every column in :data:`ANALYTICS_COLUMNS` is guaranteed present (empty string
+    when the loaded batch predates the dataset swap), so downstream chart code
+    can index directly and simply render an empty state.
     """
     import pandas as pd
 
     frame = pd.DataFrame(load_tickets())
     if frame.empty:
-        return frame
+        return pd.DataFrame(columns=ANALYTICS_COLUMNS + ["csat_value"])
+
+    for column in ANALYTICS_COLUMNS:
+        if column not in frame.columns:
+            frame[column] = ""
+
     # csat arrives as a string ("" for the ~67% of tickets that are not closed).
-    frame["csat_value"] = pd.to_numeric(frame.get("csat"), errors="coerce")
+    frame["csat_value"] = pd.to_numeric(frame["csat"], errors="coerce")
     return frame
 
 
@@ -179,7 +200,7 @@ def csat_summary() -> Dict[str, object]:
     bare average would silently describe a minority of the queue.
     """
     frame = tickets_frame()
-    if frame.empty or "csat_value" not in frame:
+    if frame.empty:
         return {"mean": None, "rated": 0, "total": 0, "coverage": 0.0, "histogram": {}}
     values = frame["csat_value"].dropna()
     total = len(frame)
@@ -224,31 +245,36 @@ def data_integrity() -> Dict[str, object]:
     from src.evaluate import independence
 
     frame = tickets_frame()
-    out: Dict[str, object] = {"total": len(frame)}
+    out: Dict[str, object] = {
+        "total": len(frame),
+        "subject_independence": None,
+        "unique_subjects": 0,
+        "timestamp_pairs": 0,
+        "timestamp_inverted": 0,
+        "timestamp_inverted_rate": 0.0,
+        "response_days": 0,
+        "csat": csat_summary(),
+    }
     if frame.empty:
         return out
 
     # 1. Is the ground-truth label predictable from the ticket's own subject?
-    pairs = [
-        (s, p) for s, p in zip(frame.get("subject", []), frame.get("true_priority", []))
-        if s and p
-    ]
+    pairs = [(s, p) for s, p in zip(frame["subject"], frame["true_priority"]) if s and p]
     out["subject_independence"] = independence(pairs) if pairs else None
-    out["unique_subjects"] = int(frame["subject"].nunique()) if "subject" in frame else 0
+    out["unique_subjects"] = int(frame["subject"].nunique())
 
     # 2. Do the timestamps describe a coherent timeline?
-    first = pd.to_datetime(frame.get("first_response_at"), errors="coerce")
-    resolved = pd.to_datetime(frame.get("resolved_at"), errors="coerce")
+    first = pd.to_datetime(frame["first_response_at"], errors="coerce")
+    resolved = pd.to_datetime(frame["resolved_at"], errors="coerce")
     both = first.notna() & resolved.notna()
+    pair_count = int(both.sum())
     inverted = int(((resolved < first) & both).sum())
-    out["timestamp_pairs"] = int(both.sum())
+    out["timestamp_pairs"] = pair_count
     out["timestamp_inverted"] = inverted
-    out["timestamp_inverted_rate"] = inverted / int(both.sum()) if both.sum() else 0.0
+    out["timestamp_inverted_rate"] = inverted / pair_count if pair_count else 0.0
     spread = first.dropna()
     out["response_days"] = int(spread.dt.normalize().nunique()) if len(spread) else 0
 
-    # 3. How much of the batch carries a satisfaction rating at all?
-    out["csat"] = csat_summary()
     return out
 
 

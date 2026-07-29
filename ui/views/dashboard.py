@@ -89,10 +89,17 @@ def _style(chart: alt.Chart) -> alt.Chart:
 
     Altair cannot read CSS variables (a Vega-Lite spec is JSON, rendered to SVG),
     so every colour has to be resolved in Python for whichever theme is active.
+
+    ``background="transparent"`` is load-bearing for dark mode: Vega-Lite paints
+    an opaque white canvas by default, which left every chart sitting on a bright
+    slab inside a dark card. It must be paired with ``theme=None`` at the
+    ``st.altair_chart`` call site (see :func:`_chart`) — Streamlit's own Vega
+    theme is applied *after* the spec and puts the white background back.
     """
     col = theme.chart_colors()
     return (
-        chart.configure_view(strokeWidth=0, fill=None)
+        chart.configure(background="transparent")
+        .configure_view(strokeWidth=0, fill=None)
         .configure_axis(
             labelColor=col["muted"], titleColor=col["muted"],
             gridColor=col["grid"], domainColor=col["grid"],
@@ -102,6 +109,17 @@ def _style(chart: alt.Chart) -> alt.Chart:
                           labelFontSize=11, titleFontSize=11)
         .configure_title(color=col["text"], fontSize=12)
     )
+
+
+def _chart(chart: alt.Chart) -> None:
+    """Render a styled chart.
+
+    ``theme=None`` disables Streamlit's own Vega-Lite theme so the configuration
+    from :func:`_style` survives. With the default ``theme="streamlit"`` the
+    chart keeps a white background and light axis labels regardless of what the
+    spec asks for.
+    """
+    st.altair_chart(_style(chart), use_container_width=True, theme=None)
 
 
 def _bar(frame: pd.DataFrame, x: str, y: str, color: str = None,
@@ -134,6 +152,25 @@ def _donut(frame: pd.DataFrame, category: str, value: str) -> alt.Chart:
 
 def _counts_frame(mapping: dict, key: str, value: str = "Tickets") -> pd.DataFrame:
     return pd.DataFrame({key: list(mapping.keys()), value: list(mapping.values())})
+
+
+def _has_data(frame: pd.DataFrame, *columns: str) -> bool:
+    """True when every named column exists *and* carries at least one value.
+
+    Column presence alone is not enough: ``domain.tickets_frame`` guarantees the
+    analytics columns exist so chart code can index them directly, filling them
+    with empty strings for a batch generated before the dataset swap. Testing
+    ``in frame.columns`` would therefore always pass and hand Altair an empty
+    group-by instead of showing the empty state.
+    """
+    if frame.empty:
+        return False
+    for column in columns:
+        if column not in frame.columns:
+            return False
+        if not (frame[column].fillna("").astype(str).str.strip() != "").any():
+            return False
+    return True
 
 
 # --- Sections -----------------------------------------------------------------
@@ -170,7 +207,7 @@ def _volume_charts(frame: pd.DataFrame) -> None:
 
     with left:
         c.section("Ticket volume by type and priority")
-        if {"ticket_type", "true_priority"} <= set(frame.columns):
+        if _has_data(frame, "ticket_type", "true_priority"):
             grouped = (
                 frame.groupby(["ticket_type", "true_priority"])
                 .size().reset_index(name="Tickets")
@@ -185,7 +222,7 @@ def _volume_charts(frame: pd.DataFrame) -> None:
                 xOffset=alt.XOffset("Priority:N", sort=PRIORITY_ORDER),
                 tooltip=["Type", "Priority", "Tickets"],
             ).properties(height=280)
-            st.altair_chart(_style(chart), use_container_width=True)
+            _chart(chart)
             st.caption(
                 "Grouped by the dataset's own priority label. The bars are near "
                 "level across every type — that flatness is the dataset, not the "
@@ -198,11 +235,8 @@ def _volume_charts(frame: pd.DataFrame) -> None:
         c.section("Arrival channel")
         channel = domain.count_by("channel")
         if channel:
-            st.altair_chart(
-                _style(_donut(_counts_frame(channel, "Channel"), "Channel", "Tickets")
-                       .properties(height=280)),
-                use_container_width=True,
-            )
+            _chart(_donut(_counts_frame(channel, "Channel"), "Channel", "Tickets")
+                   .properties(height=280))
             top = max(channel.values()) / sum(channel.values()) * 100
             st.caption(
                 f"Four channels, largest at {top:.0f}%. An even split is what this "
@@ -219,11 +253,8 @@ def _status_and_satisfaction(frame: pd.DataFrame) -> None:
         c.section("Resolution status")
         status = domain.status_summary()
         if status["counts"]:
-            st.altair_chart(
-                _style(_donut(_counts_frame(status["counts"], "Status"), "Status", "Tickets")
-                       .properties(height=260)),
-                use_container_width=True,
-            )
+            _chart(_donut(_counts_frame(status["counts"], "Status"), "Status", "Tickets")
+                   .properties(height=260))
             st.caption(
                 f"{status['unresolved']:,} of {status['total']:,} tickets are still "
                 "open or awaiting a customer reply."
@@ -239,9 +270,12 @@ def _status_and_satisfaction(frame: pd.DataFrame) -> None:
                 {f"{k} ★": v for k, v in csat["histogram"].items()}, "Rating"
             )
             chart = _bar(hist, "Rating", "Tickets", y_title="Tickets").encode(
-                color=alt.value(theme.priority(Category.LOW).color)
+                # labelAngle=0: the default rotates short labels like "3 ★"
+                # vertically, which is unreadable for a five-bar histogram.
+                x=alt.X("Rating:N", sort=None, title=None, axis=alt.Axis(labelAngle=0)),
+                color=alt.value(theme.priority(Category.LOW).color),
             ).properties(height=260)
-            st.altair_chart(_style(chart), use_container_width=True)
+            _chart(chart)
             st.caption(
                 f"Only closed tickets carry a rating: {csat['rated']:,} of "
                 f"{csat['total']:,} ({csat['coverage'] * 100:.1f}%). The mean of "
@@ -265,14 +299,14 @@ def _breakdowns(frame: pd.DataFrame) -> None:
                          horizontal=True, y_title="Tickets").encode(
                 color=alt.value(theme.priority(Category.MEDIUM).color)
             ).properties(height=300)
-            st.altair_chart(_style(chart), use_container_width=True)
+            _chart(chart)
             st.caption(f"Top 10 of {len(products)} products in the batch.")
         else:
             c.empty_state("No product data in this batch.")
 
     with right:
         c.section("Priority against status")
-        if {"true_priority", "status"} <= set(frame.columns):
+        if _has_data(frame, "true_priority", "status"):
             grid = (
                 frame.groupby(["true_priority", "status"])
                 .size().reset_index(name="Tickets")
@@ -285,7 +319,7 @@ def _breakdowns(frame: pd.DataFrame) -> None:
                                 legend=alt.Legend(title="Tickets")),
                 tooltip=["Priority", "Status", "Tickets"],
             ).properties(height=300)
-            st.altair_chart(_style(chart), use_container_width=True)
+            _chart(chart)
             st.caption(
                 "A uniform block. If priority drove handling, Critical tickets "
                 "would close at a different rate than Low ones. They do not."
