@@ -55,10 +55,23 @@ def load_tickets(path: Path) -> List[Ticket]:
                     id=row["id"],
                     subject=row.get("subject", ""),
                     body=row.get("body", ""),
-                    true_priority=(row.get("priority", "") or "").strip().lower(),
+                    # Title-case, not lower: the dataset labels are now the same
+                    # four-level vocabulary as Category ("Critical"/"High"/...),
+                    # so lowercasing here would silently stop every label from
+                    # matching DATASET_LABELS during evaluation.
+                    true_priority=(row.get("priority", "") or "").strip().title(),
                     true_queue=row.get("queue", ""),
-                    language=row.get("language", ""),
                     tags=[t for t in (row.get("tags", "") or "").split(";") if t],
+                    status=row.get("status", ""),
+                    channel=row.get("channel", ""),
+                    product=row.get("product", ""),
+                    ticket_type=row.get("ticket_type", ""),
+                    csat=row.get("csat", ""),
+                    first_response_at=row.get("first_response_at", ""),
+                    resolved_at=row.get("resolved_at", ""),
+                    purchase_date=row.get("purchase_date", ""),
+                    requester_name=row.get("requester_name", ""),
+                    requester_email=row.get("requester_email", ""),
                 )
             )
     return tickets

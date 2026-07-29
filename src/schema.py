@@ -24,10 +24,12 @@ class Category(str, Enum):
     """Product-facing priority scale (four levels).
 
     Inherits from ``str`` so members serialise straight to JSON as their value.
-    The dataset only labels tickets ``low/medium/high`` — there is no Critical
-    label — so :meth:`ground_truth_bucket` collapses this four-level scale back
-    onto the dataset's three levels for honest evaluation. See PROJECT_PLAN.md
-    §5 and the plan's "Critical label" decision.
+
+    The current dataset (``customer_support_tickets.csv``) labels tickets on this
+    exact four-level scale, Critical included, so the product scale and the ground
+    truth are the same vocabulary and no collapsing is needed. The earlier
+    multilingual dataset topped out at ``high``, which is why
+    :meth:`ground_truth_bucket` exists at all — see its docstring.
     """
 
     CRITICAL = "Critical"
@@ -59,17 +61,27 @@ class Category(str, Enum):
         return self.rank >= other.rank
 
     def ground_truth_bucket(self) -> str:
-        """Map the four-level product scale onto the dataset's three labels.
+        """The label this category is compared against during evaluation.
 
-        Critical and High both map to the dataset's top-severity ``high`` bucket,
-        so "Critical-class recall" is measured as: of tickets truly labelled
-        ``high``, how many did the scorer flag Critical *or* High.
+        Now an identity mapping. The current dataset labels tickets on the same
+        four-level scale the product uses, so a prediction is compared to the
+        ground truth directly and "Critical" means Critical.
+
+        This used to collapse Critical and High into a single ``high`` bucket,
+        because the previous dataset had no Critical label and scoring against it
+        otherwise would have marked every correct Critical call as wrong. Kept as
+        a named seam so a future dataset with a coarser scale has one obvious
+        place to reintroduce a mapping.
         """
-        if self is Category.CRITICAL or self is Category.HIGH:
-            return "high"
-        if self is Category.MEDIUM:
-            return "medium"
-        return "low"
+        return self.value
+
+    def top_severity(self) -> bool:
+        """True for the Critical-class bucket (Critical or High).
+
+        Recall over this bucket is the metric tied to Jordan's 4-hour billing
+        incident: a top-severity ticket read as routine is the costliest failure.
+        """
+        return self is Category.CRITICAL or self is Category.HIGH
 
     @classmethod
     def from_score(cls, score: int) -> "Category":
@@ -83,8 +95,14 @@ class Category(str, Enum):
         return cls.LOW
 
 
-# Canonical dataset priority labels, ordered least → most urgent.
-DATASET_LABELS: List[str] = ["low", "medium", "high"]
+# Canonical dataset priority labels, ordered least → most urgent. Identical to
+# the product scale now that the dataset carries a real Critical label.
+DATASET_LABELS: List[str] = [
+    Category.LOW.value,
+    Category.MEDIUM.value,
+    Category.HIGH.value,
+    Category.CRITICAL.value,
+]
 
 
 @dataclass
@@ -97,8 +115,22 @@ class Ticket:
     # Ground-truth fields from the dataset (used for evaluation, not scoring).
     true_priority: str = ""          # one of DATASET_LABELS
     true_queue: str = ""
-    language: str = ""
     tags: List[str] = field(default_factory=list)
+
+    # Operational fields carried straight through from the dataset. The dashboard
+    # reads these; the scorer never does. `csat`, `first_response_at` and
+    # `resolved_at` are only populated for closed tickets, so anything consuming
+    # them must handle the empty string.
+    status: str = ""
+    channel: str = ""
+    product: str = ""
+    ticket_type: str = ""
+    csat: str = ""
+    first_response_at: str = ""
+    resolved_at: str = ""
+    purchase_date: str = ""
+    requester_name: str = ""
+    requester_email: str = ""
 
     @property
     def text(self) -> str:
@@ -132,8 +164,17 @@ class ScoredTicket:
             "body": self.ticket.body,
             "true_priority": self.ticket.true_priority,
             "true_queue": self.ticket.true_queue,
-            "language": self.ticket.language,
             "tags": self.ticket.tags,
+            "status": self.ticket.status,
+            "channel": self.ticket.channel,
+            "product": self.ticket.product,
+            "ticket_type": self.ticket.ticket_type,
+            "csat": self.ticket.csat,
+            "first_response_at": self.ticket.first_response_at,
+            "resolved_at": self.ticket.resolved_at,
+            "purchase_date": self.ticket.purchase_date,
+            "requester_name": self.ticket.requester_name,
+            "requester_email": self.ticket.requester_email,
             "score": self.score,
             "category": self.category.value,
             "matched_signals": self.matched_signals,
@@ -151,8 +192,17 @@ class ScoredTicket:
             body=d.get("body", ""),
             true_priority=d.get("true_priority", ""),
             true_queue=d.get("true_queue", ""),
-            language=d.get("language", ""),
             tags=list(d.get("tags", []) or []),
+            status=d.get("status", ""),
+            channel=d.get("channel", ""),
+            product=d.get("product", ""),
+            ticket_type=d.get("ticket_type", ""),
+            csat=d.get("csat", ""),
+            first_response_at=d.get("first_response_at", ""),
+            resolved_at=d.get("resolved_at", ""),
+            purchase_date=d.get("purchase_date", ""),
+            requester_name=d.get("requester_name", ""),
+            requester_email=d.get("requester_email", ""),
         )
         return cls(
             ticket=ticket,
