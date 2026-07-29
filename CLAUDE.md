@@ -7,8 +7,10 @@ This repo will be shown to hiring managers on a portfolio site, so process and d
 ## Git workflow
 
 - Initialize git on the first run if not already a repo.
-- Make **one commit per completed stage**, not continuous small "wip" commits. A stage is done when its "Done when" criteria in `PROJECT_PLAN.md` Section 8 is met.
-- Use Conventional Commits style (`feat:`, `fix:`, `docs:`, `test:`, `chore:`). See `PROJECT_PLAN.md` Section 11 for the exact commit sequence to follow.
+- Commit **every logical change**, not once per multi-day stage. A commit should be the smallest change that leaves the repo working — tests green, app runnable. Never commit a broken intermediate state just to hit a smaller commit; if three files must change together to keep the suite passing, that is one change, not three.
+- Superseded: this file previously asked for one commit per Section 8 stage. That produced commits too large to review or revert. Section 11's commit sequence still describes the intended *order* of work; it is no longer a cap on commit count.
+- Use Conventional Commits style (`feat:`, `fix:`, `docs:`, `test:`, `chore:`).
+- Write commit bodies that explain **why**, not what — the diff already shows what. State the reasoning, the alternative rejected, and anything a reviewer would otherwise have to reconstruct.
 - Never commit `.env`, API keys, or secrets. Confirm `.gitignore` covers `.env`, `__pycache__/`, and `data/raw/` before the first commit.
 - Tag the final working commit `v1.0`.
 - Before each commit, briefly state in chat what stage just completed and what the commit message will be, so progress is visible.
