@@ -32,12 +32,30 @@ triage automatically.
 ### The console
 
 A dark navigation rail with grouped menus (Your work / Shared work / Completed
-work / Insights), a Home dashboard, a filterable queue, and a three-column ticket
+work / Account), a Home view, a filterable queue, and a three-column ticket
 workspace: properties on the left, the conversation and the AI rationale as an
-internal note in the middle, requester context on the right.
+internal note in the middle, requester context on the right. Plus a **Dashboard**
+of ticket analytics, a profile menu, and a dark mode.
 
 Region-by-region parity against the Zendesk reference is tracked in
 [`docs/UI_SPEC.md`](docs/UI_SPEC.md).
+
+### The Dashboard, and the two charts that aren't on it
+
+The Dashboard carries KPI tiles (open, awaiting customer, unresolved rate,
+satisfaction, Critical), ticket volume by type and priority, channel and status
+distribution, a satisfaction histogram, top products, and a priority-against-
+status heatmap.
+
+It does **not** carry average resolution time or ticket volume over time, and it
+says so on the page. Neither is computable from this dataset without inventing
+numbers: 49.3% of closed tickets record a resolution *earlier* than their first
+response, and every response timestamp in 8,469 rows falls inside a single 3-day
+window. A "Data integrity" panel states this in the product, with the figures
+computed live from the loaded batch rather than transcribed from a one-off
+analysis.
+
+That panel is the most useful thing on the page. Details below.
 
 ```
 🔴 Critical  92  Payment failed on renewal, account locked out   Billing and Payments   ⚠️ breached  🛡️
@@ -49,60 +67,87 @@ Region-by-region parity against the Zendesk reference is tracked in
 ### Real data vs. simulated demo data
 
 The console's layout follows Zendesk, which displays requester identity,
-conversation threads, and interaction history. **This dataset contains none of
-those.** Rather than leave the panels empty or quietly invent content, they are
-filled with values derived deterministically from the ticket id, and every such
-panel renders a `simulated` badge. The Settings page lists the full breakdown.
+conversation threads, and interaction history. Where the dataset has no source
+column, panels are filled with values derived deterministically from the ticket
+id and render a `simulated` badge. The Settings page lists the full breakdown.
 
 | Real | Simulated for demonstration |
 |---|---|
-| Priority, urgency score, category | Requester name, email, phone, organization |
-| Matched keyword signals | Requester local time |
-| Critical-class safety-net state | Agent reply turns in the thread |
-| AI rationale and suggested queue | Interaction history |
-| Subject, body, tags, ground-truth labels | Ticket age and the SLA countdown |
+| Priority, urgency score, category | Requester phone, organization, city, local time |
+| Matched keyword signals | Agent reply turns in the thread |
+| Critical-class safety-net state | Interaction history |
+| AI rationale and suggested queue | Ticket age and the SLA countdown |
+| Subject, body, tags, four-level ground-truth label | |
+| Requester name and email | |
+| Ticket status, channel, type, product | |
+| Customer satisfaction rating (closed tickets only) | |
 | Your confirm/override decisions, and the agreement statistics computed from them | |
 
 Nothing in the simulated column influences triage.
 
 ## Results (measured, not estimated)
 
-Evaluated on **11,923 English tickets** from the Kaggle multilingual
-customer-support dataset, comparing the rule-based scorer to the dataset's own
-`low`/`medium`/`high` ground-truth labels. The dataset has no "Critical" label,
-so the product's four-level output is collapsed onto the dataset's three levels
-(**Critical + High → `high`**) for an honest comparison. Full report:
-[`results/evaluation.md`](results/evaluation.md).
+Evaluated on all **8,469 tickets** in the Kaggle customer-support dataset,
+comparing the rule-based scorer to the dataset's own four-level `Ticket Priority`
+label. Full report: [`results/evaluation.md`](results/evaluation.md).
 
-| Metric | Value |
-|---|---|
-| **Top-severity (Critical-class) recall** — of `high` tickets, % flagged ≥ High | **49.2%** |
-| Overall accuracy (3-way) | 41.6% |
-| Recall — medium / low | 44.9% / 20.5% |
-| Precision — high / medium | 46.8% / 44.6% |
+**The scorer performs at chance on this dataset. That is a property of the
+dataset, not a bug in the scorer, and this section exists to prove the
+difference.**
+
+| Metric | Value | Baseline |
+|---|---|---|
+| Overall accuracy (4-way) | **26.0%** | 25.0% by chance |
+| **Critical-class recall** — of `Critical` tickets, % flagged Critical or High | **28.4%** | 27.9% — the rate the scorer flags *anything* top-severity |
+| Top-severity recall (`Critical` + `High`) | 28.8% | — |
 
 Confusion matrix (truth ↓ / prediction →):
 
-| | low | medium | high |
-|---|---|---|---|
-| **high** | 708 | 1,616 | 2,247 |
-| **medium** | 945 | 2,222 | 1,785 |
-| **low** | 493 | 1,141 | 766 |
+| | Critical | High | Medium | Low |
+|---|---|---|---|---|
+| **Critical** | 173 | 432 | 1,067 | 457 |
+| **High** | 170 | 437 | 1,050 | 428 |
+| **Medium** | 158 | 419 | 1,140 | 475 |
+| **Low** | 147 | 427 | 1,035 | 454 |
 
-**Reading the numbers honestly.** Priority in this generic dataset is only
-weakly expressed through keywords, so a keyword scorer has a real ceiling — most
-`high` tickets simply contain no urgency vocabulary. The calibration therefore
-**optimizes recall on the top-severity class over overall accuracy** (a missed
-critical ticket is Jordan's 4-hour incident; a false alarm is cheap), which is
-why `high` precision is deliberately traded down. Where the system is *provably*
-strong is the safety net: **every ticket containing a hard-priority signal is
-guaranteed to escalate to at least High**, verified by parametrized tests
-(`tests/test_rule_scorer.py`).
+Read the rows, not the diagonal. They are nearly identical — the scorer emits the
+same distribution of predictions whether the ticket is truly Critical or truly
+Low. That shape, not the accuracy figure, is the finding.
+
+**Why no classifier could do better here.** Two chi-square tests of independence:
+
+| Test | chi² | dof | Cramér's V |
+|---|---|---|---|
+| Scorer prediction × true label | 7.0 | 9 | 0.017 |
+| **Ticket subject × true label** | **40.9** | **45** | **0.040** |
+
+Both statistics sit at or below their degrees of freedom, which is what pure
+independence looks like — under the null hypothesis the expected value of chi² *is*
+dof. The second row does not involve the scorer at all: the ticket's own subject
+line does not predict its priority. The dataset ships **16 distinct subject
+lines** across 8,469 tickets and a templated body whose `{product_purchased}`
+placeholder was never interpolated in the source file. The text and the labels
+were generated independently, so there is no signal for any model to learn.
+
+**What is still provably true.** The Critical-class safety net fired on **1,525
+tickets (18.0%)**. It is a deterministic guarantee about vocabulary, not a
+prediction: **every ticket containing a hard-priority signal escalates to at
+least High**, verified by parametrized tests (`tests/test_rule_scorer.py`). What
+this dataset removes is the ability to *measure* whether escalation correlates
+with the label, because the label correlates with nothing. The mechanism is
+intact; the measuring stick is broken.
+
+**On the previous dataset.** An earlier version of this project ran on a
+multilingual Kaggle set of 11,923 English tickets and reached 49.2% top-severity
+recall at 41.6% accuracy. That dataset had no `Critical` label and none of the
+status, channel, or satisfaction columns the Dashboard needs. The swap traded a
+better-looking headline for a dataset that supports the product — and surfaced a
+label-quality problem worth reporting. Both are in the git history.
 
 ## Architecture
 
 ```
-Ticket source (Kaggle CSV, simulating incoming tickets)
+Ticket source (customer_support_tickets.csv — 8,469 rows, 17 columns)
         │
         ▼
 [1] Rule-based scorer  ──► deterministic score (0-100) + category + safety net
@@ -125,8 +170,13 @@ point of failure.
 
 ## Tech stack
 
-Python 3.9+ · pandas · Streamlit · Anthropic Python SDK (`claude-opus-4-8`,
-structured JSON output) · python-dotenv · pytest.
+Python 3.9+ · pandas · Streamlit · Altair · Anthropic Python SDK
+(`claude-opus-4-8`, structured JSON output) · python-dotenv · pytest.
+
+Chi-square and Cramér's V are implemented directly in `src/evaluate.py` rather
+than pulled from scipy — a heavy dependency for two functions in a Streamlit app.
+They are verified against known critical values (chi²=3.841 at 1 dof → p=0.0500)
+and against V=1.0/0.0 on perfectly dependent and independent inputs.
 
 ## Setup & run
 
@@ -134,8 +184,8 @@ structured JSON output) · python-dotenv · pytest.
 python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 
-# 1. Build the English-only, priority-mapped working set from the raw Kaggle CSV
-#    (place the CSV in data/raw/ first — see PROJECT_PLAN.md §5 for the dataset link)
+# 1. Build the working set from the raw Kaggle CSV
+#    (place customer_support_tickets.csv in data/raw/ first)
 python src/data_prep.py
 
 # 2. Classify the batch (score-only; no API key needed)
@@ -178,12 +228,22 @@ python -m src.batch_classify --with-rationale
 
 ## Limitations & what's next
 
-- **English-only** (German tickets are filtered out — a stated scope limit).
-- Keyword lists are tuned to a generic IT-support dataset, not a real company's
-  product taxonomy, which caps accuracy.
-- **Next:** run the live Claude rationale batch and tag `v1.0`; add a lightweight
-  trained classifier (TF-IDF + logistic regression) as a comparison baseline;
-  deploy the Streamlit app to Streamlit Community Cloud for a clickable demo.
+- **The dataset's labels are not learnable from its text.** Every accuracy figure
+  above is bounded by that, and no amount of scorer tuning changes it. The
+  evidence is in the Results section and in the console's own data-integrity
+  panel.
+- **The ticket bodies are templated** — 16 distinct subject lines across 8,469
+  tickets, with a placeholder the source file never interpolated.
+- **Average resolution time and volume-over-time are not reported anywhere**,
+  because the timestamps cannot support them.
+- Keyword lists are tuned to a generic IT-support vocabulary, not a real
+  company's product taxonomy, which caps accuracy independently of the above.
+- The dark-mode preference is scoped to the browser session and the URL; there is
+  no server-side user preference store, because there is no user account system.
+- **Next:** validate the scorer against a dataset whose labels correlate with its
+  text — that is the only way to get a meaningful accuracy number, and it is a
+  better use of time than tuning keywords against noise. Then run the live Claude
+  rationale batch, tag `v1.0`, and deploy to Streamlit Community Cloud.
 
 ## Author
 

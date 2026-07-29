@@ -41,24 +41,49 @@ opens the queue, and explains each decision in plain language:
 
 ## The impact
 
-On 11,923 real tickets, the scorer catches **49% of all high-priority tickets**
-from keyword signals alone on a generic dataset, and — more importantly —
-**provably escalates 100% of tickets that contain a hard-priority signal**, which
-is the case that burned Jordan. Time-to-sorted-queue drops from ~90 minutes of
-manual reading to instant. The billing-ticket scenario, re-run through the
-system, is now flagged Critical automatically.
+Time-to-sorted-queue drops from ~90 minutes of manual reading to instant, and the
+safety net **provably escalates 100% of tickets containing a hard-priority
+signal** — the exact case that burned Jordan. That guarantee is verified by
+parametrized tests, not estimated. The billing-ticket scenario, re-run through the
+system, is flagged Critical automatically.
 
-I was deliberate about reporting these numbers honestly: priority in a generic
-dataset is only weakly expressed in words, so I tuned for *recall on the urgent
-class over headline accuracy* — because missing a critical ticket costs far more
-than a false alarm — and documented that trade-off rather than hiding it.
+## The part I did not expect
+
+Partway through, I swapped in a richer dataset so the dashboard could show ticket
+status, channel, and satisfaction — columns the original data simply didn't have.
+Before trusting it, I profiled it. The priority labels turned out to be
+**statistically independent of the ticket text**: chi-square at or below its
+degrees of freedom for every text-versus-label pair, Cramér's V of 0.04, only 16
+distinct subject lines across 8,469 tickets, and a template placeholder the
+source file had never filled in. Half the "closed" tickets recorded a resolution
+timestamp *earlier* than their first response.
+
+So the scorer that had measured 49% recall on the old data now measured 26%
+accuracy against a 25% chance baseline. The confusion matrix said it more clearly
+than any statistic: all four rows were nearly identical, meaning the scorer
+predicted the same thing whether a ticket was truly Critical or truly Low.
+
+I had two options. Report the lower number quietly, or report what the number
+actually meant. I did the second: the console now carries a "Data integrity"
+panel that states the labels are unlearnable, shows the chi-square evidence, and
+explains why two charts the brief asked for — average resolution time and volume
+over time — are **not on the dashboard at all**. They were cut rather than faked.
+
+That decision cost the project its best-looking headline metric. I think it is
+the most valuable thing in the repo. Anyone can produce a number. Knowing when a
+number is meaningless, proving it, and saying so in the product is the harder
+skill and the one that actually protects a business from acting on noise.
 
 ## What I'd do differently / next
 
-- Tune the keyword taxonomy to a real company's product vocabulary, where
-  urgency language is far more consistent than in a generic dataset.
+- **Validate against a dataset whose labels correlate with its text.** That is the
+  only way to get a meaningful accuracy figure, and it beats tuning keywords
+  against noise.
+- Profile label quality *before* building on a dataset, not after. Ten minutes of
+  chi-square would have reframed the swap up front.
 - Add a small trained classifier (TF-IDF + logistic regression) as a comparison
-  baseline against the rule-based scorer.
+  baseline — on data where learning is possible, it would establish the ceiling
+  the rule-based scorer is measured against.
 - Deploy the dashboard so a hiring manager can click through it, not just read
   about it.
 

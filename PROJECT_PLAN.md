@@ -40,24 +40,24 @@ Trade-off accepted: Streamlit won't pixel-match Zendesk's UI. We'll approximate 
 
 ## 5. Data
 
-**Source:** [Customer IT Support Ticket Dataset (Kaggle)](https://www.kaggle.com/datasets/tobiasbueck/multilingual-customer-support-tickets) — labeled email tickets with priority, queue, tags, and business type.
+**Source (current):** `customer_support_tickets.csv` — 8,469 rows, 17 columns, carrying ticket status, arrival channel, product, customer identity, satisfaction rating, and a **four-level** `Ticket Priority` label including `Critical`.
 
-**Backup:** [Support Ticket Priority Dataset (50K)](https://www.kaggle.com/datasets/albertobircoci/support-ticket-priority-dataset-50k) if the primary dataset needs supplementing.
+**Source (original, superseded):** [Customer IT Support Ticket Dataset (Kaggle)](https://www.kaggle.com/datasets/tobiasbueck/multilingual-customer-support-tickets) — multilingual, 11,923 English tickets after filtering, labelled `low`/`medium`/`high` only. Swapped out because the Dashboard needs status, channel, and satisfaction columns it does not have. The original evaluation (49.2% top-severity recall, 41.6% accuracy) is preserved in the git history.
 
-**Scope decision — English only:** the primary dataset is multilingual. Keyword-based scoring won't work on non-English text, so Day 1–2 includes filtering the dataset down to English-language tickets only. This is a stated scope limitation for the two-week build, not a bug to fix later.
+**Scope decision — English only:** applied to the original multilingual dataset. The current dataset is single-language, so the filter is no longer needed and `data_prep` no longer emits a `language` column.
 
 **Ground truth for evaluation:** the dataset's existing priority labels are treated as ground truth. The rule-based scorer's output is what gets evaluated against them (the LLM layer only generates rationale text, it doesn't set the category — see Section 10).
 
-**Priority mapping** (dataset → product card scale):
+**Priority mapping** (dataset → product card scale): now an identity mapping. The dataset labels on the same four levels the product uses, so `Category.ground_truth_bucket()` no longer collapses Critical and High into one bucket to evaluate. Score ranges are unchanged:
 
 | Dataset label | Product card category | Score range |
 |---|---|---|
 | Critical | 🔴 Critical | 90–100 |
-| High / Medium (dataset dependent — confirm during exploration) | 🟠 High | 65–89 |
-| Low-Medium | 🟡 Medium | 35–64 |
+| High | 🟠 High | 65–89 |
+| Medium | 🟡 Medium | 35–64 |
 | Low | 🟢 Low | 0–34 |
 
-Exact mapping gets finalized once the dataset is loaded and its label distribution is inspected (Day 1–2).
+**⚠️ Known defect in the current dataset — read before interpreting any accuracy number.** `Ticket Priority` is statistically independent of the ticket text (chi-square at or below its degrees of freedom for every text/label pair; Cramér's V ≈ 0.04). There are 16 distinct subject lines across 8,469 rows, and the raw descriptions ship with an uninterpolated `{product_purchased}` template token. The scorer therefore runs at 26.0% against a 25.0% chance baseline, and no classifier reading this text could do better. `src/evaluate.py` measures and reports this directly. **Do not "fix" it by relabelling.** The timestamp columns are likewise unusable: 49.3% of closed tickets record a resolution earlier than their first response, and all response timestamps fall inside a 3-day window — which is why the Dashboard omits average-resolution-time and volume-over-time charts.
 
 ## 6. Repo Structure
 
