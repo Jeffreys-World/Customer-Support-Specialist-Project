@@ -61,10 +61,24 @@ class Color:
     TEXT = "#2F3941"
     TEXT_MUTED = "#68737D"
 
-    CRITICAL = "#CC3340"
-    HIGH = "#ED8F1C"
-    MEDIUM = "#EFC02D"
-    LOW = "#2E8B57"
+    # Priority accents as CHART fills. These are deliberately not the same values
+    # as the `--tc-*` variables the stylesheet uses for text, because the two
+    # answer different WCAG rules: a chart mark is a graphical object and owes
+    # 3:1 (1.4.11), while a KPI numeral is text and owes 4.5:1 at body size.
+    #
+    # Collapsing them to one value was tried and rejected by measurement. Pushing
+    # these to the text values (High #AD650E, Medium #93720B) drops the perceptual
+    # distance between the High and Medium series from 27.8 to 19.3 dE — below the
+    # ~20 where two series in one chart stop reading as different colours. That
+    # trades a contrast failure for a legibility failure.
+    #
+    # So each is darkened along its own hue only as far as the 3:1 floor, which
+    # holds separation at 22.8 dE. (A hue shift on Medium toward #989A04 scores
+    # 43.8 dE and also clears 3:1, if the golden identity is ever up for change.)
+    CRITICAL = "#CC3340"   # 5.10:1 — already clear, unchanged
+    HIGH = "#D97F11"       # was #ED8F1C, 2.46:1 -> 3.00:1
+    MEDIUM = "#B98F0E"     # was #EFC02D, 1.71:1 -> 3.00:1
+    LOW = "#2E8B57"        # 4.25:1 — already clear, unchanged
 
 
 @dataclass(frozen=True)
