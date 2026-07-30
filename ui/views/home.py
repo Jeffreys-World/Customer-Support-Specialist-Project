@@ -66,15 +66,23 @@ def _statistics(tickets, counts) -> None:
     breached = sum(1 for t in tickets if domain.sla_breached(t))
 
     with st.container(border=True):
+        # Deliberately does NOT repeat Critical and High. The KPI row at the top
+        # of this same page already carries all four priority counts, so showing
+        # two of them again ~900px to the right spent the most valuable panel on
+        # the page restating what the reader had just passed. These two figures
+        # are the ones the KPI row cannot show: what is late, and what the scorer
+        # overrode. Both were already computed here; `net` was buried in a caption.
         c.stat_block(
             "Triage statistics", "This queue",
             [
-                ("Critical", counts["Critical"], "var(--tc-critical)"),
-                ("High", counts["High"], "var(--tc-high)"),
-                ("Past SLA", breached, "var(--tc-muted)"),
+                ("Past SLA", breached, "var(--tc-critical)"),
+                ("Safety net", net, "var(--tc-high)"),
             ],
         )
-        st.caption(f"{net} escalated by the Critical-class safety net.")
+        st.caption(
+            "Past SLA counts tickets over the target for their priority. "
+            "Safety net counts those a hard-priority keyword forced to at least High."
+        )
 
     with st.container(border=True):
         stats = domain.agreement_stats()
