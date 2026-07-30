@@ -405,6 +405,20 @@ html { font-size: 112.5%; }
   background: currentColor;
   flex: none;
 }
+/* Priority marker on a KPI label. Same idea as `__dot` above, but this one sits
+   in flowing text rather than a flex pill, so it needs its own box and a baseline
+   nudge. `currentColor` lets the call site tint it with the priority token, which
+   an emoji glyph could never do. */
+.tc-stat__dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  margin-right: 0.4rem;
+  position: relative;
+  top: -1px;
+}
 .tc-pill--open {
   background: var(--tc-open-tint);
   color: var(--tc-open-text);

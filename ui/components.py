@@ -571,5 +571,14 @@ def priority_bar(counts: Dict[str, int]) -> None:
             st.html(
                 f'<div class="tc-stat"><div class="tc-stat__value" style="color:{tok.var_color}">'
                 f'{esc(count(counts.get(cat.value, 0)))}</div>'
-                f'<div class="tc-stat__label">{tok.emoji} {esc(tok.label)}</div></div>'
+                # A themed dot rather than `tok.emoji`. An emoji's colour is fixed
+                # by the platform's font, so it could not follow the priority
+                # token — after the tokens were darkened for contrast, the yellow
+                # emoji no longer matched the numeral above it. It also renders
+                # differently on Windows and macOS, and this repo is worked on
+                # from both. The dot inherits the same var the numeral uses, so
+                # they can never drift again.
+                f'<div class="tc-stat__label">'
+                f'<span class="tc-stat__dot" style="color:{tok.var_color}"></span>'
+                f'{esc(tok.label)}</div></div>'
             )
