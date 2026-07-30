@@ -474,6 +474,14 @@ html { font-size: 112.5%; }
 .tc-stat__grid {
   display: flex;
   gap: 1.4rem;
+  /* Wrap, or the row overflows its card instead of reflowing. The statistics
+     rail lives in a narrow Streamlit column, and below roughly 1000px of window
+     that column gets squeezed to ~120px while three values still need ~225px.
+     As nowrap the third value ("Safety net") rendered outside the card entirely
+     and was unreadable — a number silently missing is worse than a number that
+     moved. Found by /qa at 900x800. */
+  flex-wrap: wrap;
+  row-gap: 0.85rem;
 }
 .tc-stat__value {
   font-size: 1.4rem;

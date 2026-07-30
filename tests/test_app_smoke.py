@@ -308,6 +308,25 @@ def test_type_scale_is_a_single_root_declaration():
     assert not absolute, f"font sizes must be rem so the root scale reaches them: {absolute}"
 
 
+# Regression: ISSUE-001 — the Triage statistics grid was `display:flex` with no
+# wrap, so in the narrow Streamlit column it lives in (~120px below a 1000px
+# window) three values needing ~225px overflowed the card and the third one
+# ("Safety net", 1,525) rendered outside it entirely. A missing number is worse
+# than a moved one. Found by /qa on 2026-07-30 at 900x800.
+def test_statistics_grid_wraps_instead_of_overflowing():
+    from pathlib import Path
+
+    css = (Path(__file__).resolve().parents[1] / ".streamlit" / "styles.css").read_text(
+        encoding="utf-8"
+    )
+    block = re.search(r"\.tc-stat__grid\s*\{([^}]*)\}", css)
+    assert block, ".tc-stat__grid rule missing"
+    assert re.search(r"flex-wrap:\s*wrap", block.group(1)), (
+        "the statistics grid must wrap — as nowrap its third value renders "
+        "outside the card in a squeezed column"
+    )
+
+
 def test_motion_respects_prefers_reduced_motion():
     """Motion is decoration here, so it must be fully switchable off."""
     from pathlib import Path
