@@ -70,7 +70,34 @@
 
   --tc-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
              "Helvetica Neue", Arial, sans-serif;
+
+  /* Motion. One duration/easing pair so hover states across the console agree,
+     and a single place to slow everything down when tuning. */
+  --tc-ease: cubic-bezier(0.2, 0, 0.2, 1);
+  --tc-fast: 120ms;
+  --tc-med: 200ms;
+  --tc-slow: 320ms;
+  --tc-lift: 0 2px 4px rgba(47, 57, 65, 0.10), 0 8px 20px rgba(47, 57, 65, 0.09);
 }
+
+/* ----------------------------------------------------------------------------
+   Type scale — one declaration, whole console
+   ----------------------------------------------------------------------------
+   Every font-size below is written in `rem`, which resolves against the root
+   element and not the parent. That makes the console's type a single knob: this
+   one rule rescales all ~40 sizes together, and the rem-based padding with them,
+   so bigger text does not crowd the box it sits in.
+
+   The old 16px base was Zendesk-dense to the point of being hard to read — the
+   smallest tokens landed under 10px. 112.5% puts the base at 18px, the ticket
+   rows at ~15.5px, and the uppercase panel labels at ~13px.
+
+   The ceiling here is the navigation rail, which is a fixed 268px (it cannot be
+   rem, or the rail would grow with the text and eat the workspace). At 112.5%
+   the longest label, "Safety-net escalations", still sets on one line. Going
+   much past this wraps it, so raise this and check the rail.
+   -------------------------------------------------------------------------- */
+html { font-size: 112.5%; }
 
 /* ============================================================================
    SECTION 2 — Streamlit shell overrides (the upgrade-sensitive block)
@@ -322,7 +349,10 @@
   color: var(--tc-demo-text);
   font-weight: 600;
   text-transform: uppercase;
-  font-size: 0.62rem;
+  /* Floor, not scale: 0.62rem was the smallest token in the file and even at the
+     112.5% root it renders ~11px. This badge marks simulated data (D1), so it has
+     to stay readable — it is the one label a reviewer must not miss. */
+  font-size: 0.7rem;
   letter-spacing: 0.05em;
 }
 
@@ -472,7 +502,7 @@
   margin-bottom: 0.7rem;
 }
 .tc-field__label {
-  font-size: 0.7rem;
+  font-size: 0.76rem;
   color: var(--tc-muted);
   margin-bottom: 0.1rem;
 }
@@ -596,6 +626,127 @@
   padding: 0.05rem 0.25rem;
 }
 
+/* --- "How priority is decided" explainer ---------------------------------- */
+/* Rendered by `ui.components.scorer_explainer`. Laid out as aligned rows rather
+   than a <table>: every row is a weight paired with a label, the column widths
+   are fixed, and rows read better as hoverable strips than as table cells. */
+.tc-explain { font-family: var(--tc-font); }
+.tc-explain__lede {
+  font-size: 0.87rem;
+  color: var(--tc-text);
+  margin: 0 0 0.9rem;
+  max-width: 68ch;          /* measure, not container width — this is prose */
+  line-height: 1.5;
+}
+.tc-explain__row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+  padding: 0.34rem 0.45rem;
+  margin: 0 -0.45rem;
+  border-radius: var(--tc-radius-sm);
+  border-bottom: 1px solid var(--tc-border);
+}
+.tc-explain__row:last-child { border-bottom: none; }
+.tc-explain__row--total {
+  border-top: 2px solid var(--tc-border-strong);
+  border-bottom: none;
+  margin-top: 0.2rem;
+  padding-top: 0.5rem;
+  font-weight: 700;
+}
+/* Tabular figures so the weights form a straight column even in a proportional
+   font, which is the whole point of showing an addition. */
+.tc-explain__weight,
+.tc-explain__range {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--tc-text);
+  flex: none;
+  text-align: right;
+}
+.tc-explain__weight { width: 3.1rem; font-size: 0.92rem; }
+.tc-explain__range { width: 4.2rem; font-size: 0.85rem; }
+.tc-explain__tier {
+  font-size: 0.85rem;
+  color: var(--tc-text);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.tc-explain__sample {
+  font-size: 0.78rem;
+  color: var(--tc-muted);
+  text-align: right;
+  flex: 1 1 40%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tc-explain__note {
+  font-size: 0.78rem;
+  color: var(--tc-muted);
+  font-weight: 400;
+}
+.tc-explain__hard {
+  display: inline-block;
+  margin-left: 0.45rem;
+  padding: 0.02rem 0.4rem;
+  border-radius: 999px;
+  background: var(--tc-critical-tint);
+  color: var(--tc-critical);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.tc-explain__quote {
+  font-size: 0.9rem;
+  color: var(--tc-text);
+  background: var(--tc-canvas);
+  border-left: 3px solid var(--tc-primary);
+  border-radius: var(--tc-radius-sm);
+  padding: 0.55rem 0.8rem;
+  margin: 0 0 0.7rem;
+  font-style: italic;
+}
+
+/* The safety net gets the same amber treatment as the data-integrity panel, for
+   the same reason: both are the product telling the user something load-bearing
+   about its own behaviour, and neither should look like ordinary body copy. */
+.tc-explain__net {
+  background: var(--tc-note-bg);
+  border: 1px solid var(--tc-note-border);
+  border-left: 3px solid var(--tc-critical);
+  border-radius: var(--tc-radius-sm);
+  padding: 0.9rem 1rem;
+  margin: 1.1rem 0 0.4rem;
+  font-family: var(--tc-font);
+}
+.tc-explain__net-head {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--tc-note-head);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+.tc-explain__net p {
+  font-size: 0.85rem;
+  color: var(--tc-text);
+  margin: 0 0 0.55rem;
+  max-width: 74ch;
+  line-height: 1.5;
+}
+.tc-explain__net p:last-child { margin-bottom: 0; }
+.tc-explain__net code {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.82rem;
+  background: rgba(127, 127, 127, 0.16);
+  border-radius: 3px;
+  padding: 0.05rem 0.28rem;
+}
+
 /* --- Profile menu at the foot of the rail --------------------------------- */
 .tc-profile__rule {
   border-top: 1px solid rgba(255, 255, 255, 0.14);
@@ -614,4 +765,136 @@
   background: rgba(255, 255, 255, 0.14);
   border-color: rgba(255, 255, 255, 0.3);
   color: #FFFFFF;
+}
+
+/* ============================================================================
+   SECTION 3 — Motion
+   ----------------------------------------------------------------------------
+   All of this is CSS, and that is a constraint rather than a preference. See
+   `ui.theme.inject_css`: Streamlit does not execute <script> passed through
+   st.markdown, and `components.html` runs inside an iframe that cannot reach
+   this document. So anything needing a running timer — a KPI that counts up, a
+   chart that draws itself on load — is simply not available here, and nothing
+   below pretends to do it.
+
+   What that leaves is the motion that actually matters for a triage queue:
+   feedback on the thing under the cursor. Chart interaction (hover-dim,
+   click-a-legend-to-isolate) is handled in `ui/views/dashboard.py`, where
+   Vega-Lite does it natively without any JavaScript of ours.
+
+   Durations are deliberately short. An agent works this queue for hours and
+   opens hundreds of tickets; a 500ms flourish that delights once is an
+   irritation by the fiftieth. Nothing here runs longer than --tc-slow.
+
+   Entrance animations are used sparingly and only where a replay reads as
+   "refreshed" rather than "twitchy": Streamlit reruns the whole script on every
+   interaction, so any mount animation may replay on an unrelated click.
+   ========================================================================== */
+
+@keyframes tc-fill {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+@keyframes tc-rise {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Cards lift toward the cursor. The border warming to the primary colour is the
+   part that reads as "this is interactive"; the shadow alone is too subtle
+   against the canvas. */
+[data-testid="stMainBlockContainer"] [data-testid="stVerticalBlockBorderWrapper"] {
+  transition: box-shadow var(--tc-med) var(--tc-ease),
+              border-color var(--tc-med) var(--tc-ease),
+              transform var(--tc-med) var(--tc-ease);
+}
+[data-testid="stMainBlockContainer"] [data-testid="stVerticalBlockBorderWrapper"]:hover {
+  box-shadow: var(--tc-lift);
+  border-color: var(--tc-border-strong);
+  transform: translateY(-1px);
+}
+
+/* Ticket rows. The inset bar on the left edge grows from the priority colour the
+   row already carries, so the hover state reinforces the triage signal instead
+   of adding a second, unrelated one. */
+.tc-row {
+  border-radius: var(--tc-radius-sm);
+  padding: 0.35rem 0.5rem;
+  margin: 0 -0.5rem;
+  box-shadow: inset 0 0 0 0 transparent;
+  transition: background var(--tc-fast) var(--tc-ease),
+              box-shadow var(--tc-med) var(--tc-ease);
+}
+.tc-row:hover {
+  background: var(--tc-canvas);
+  box-shadow: inset 3px 0 0 0 var(--tc-primary);
+}
+.tc-row:hover .tc-row__subject { color: var(--tc-primary); }
+.tc-row__subject { transition: color var(--tc-fast) var(--tc-ease); }
+
+/* Score bars sweep out from zero. This is the one entrance animation worth a
+   replay on rerun: the bar is the numeric claim the row is making, and redrawing
+   it is a truthful signal that the queue was just re-evaluated. */
+.tc-score__fill {
+  transform-origin: left center;
+  animation: tc-fill var(--tc-slow) var(--tc-ease) both;
+}
+
+/* KPI tiles. The value is the thing being read, so it is what responds. */
+.tc-kpi { transition: transform var(--tc-med) var(--tc-ease); }
+.tc-kpi__value { transition: letter-spacing var(--tc-med) var(--tc-ease); }
+[data-testid="stVerticalBlockBorderWrapper"]:hover .tc-kpi__value {
+  letter-spacing: -0.01em;   /* from -0.02em: the number opens up slightly */
+}
+
+/* Pills and tags: a small, quick acknowledgement. No movement, because these sit
+   inline in dense text where a shifting box would nudge its neighbours. */
+.tc-pill,
+.tc-tag {
+  transition: filter var(--tc-fast) var(--tc-ease),
+              border-color var(--tc-fast) var(--tc-ease);
+}
+.tc-pill:hover { filter: brightness(0.97) saturate(1.15); }
+.tc-tag:hover { border-color: var(--tc-primary); color: var(--tc-primary); }
+
+/* Charts fade in rather than snapping. Vega mounts its SVG asynchronously, so
+   without this a chart pops into place a beat after the text around it. */
+[data-testid="stVegaLiteChart"] {
+  animation: tc-rise var(--tc-slow) var(--tc-ease) both;
+}
+
+/* The explainer's disclosure rows (see `ui.components.explainer_*`). */
+.tc-explain__row {
+  transition: background var(--tc-fast) var(--tc-ease),
+              transform var(--tc-fast) var(--tc-ease);
+}
+.tc-explain__row:hover {
+  background: var(--tc-canvas);
+  transform: translateX(2px);
+}
+
+/* Keyboard parity. Everything above is hover-only, which leaves keyboard users
+   with no equivalent feedback — so give focus the same treatment, visibly. */
+[data-testid="stMainBlockContainer"] [data-testid="stButton"] button:focus-visible {
+  outline: 2px solid var(--tc-primary);
+  outline-offset: 2px;
+}
+
+/* Respect the OS setting. Motion here is decoration, never the only channel
+   carrying meaning, so it can all be switched off with nothing lost. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  [data-testid="stMainBlockContainer"] [data-testid="stVerticalBlockBorderWrapper"]:hover,
+  .tc-explain__row:hover,
+  .tc-kpi:hover {
+    transform: none;
+  }
 }

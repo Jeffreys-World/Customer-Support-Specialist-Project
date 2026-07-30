@@ -286,6 +286,168 @@ def test_dashboard_integrity_panel_is_computed_from_the_batch():
     assert 0 < facts["csat"]["coverage"] < 1, "CSAT should cover only closed tickets"
 
 
+# --- Type scale and motion ----------------------------------------------------
+
+def test_type_scale_is_a_single_root_declaration():
+    """Every font-size in the sheet is `rem`, which is what makes one knob work.
+
+    A `px` or `pt` font-size would silently opt out of the root scale, so the next
+    person to bump the base would find one label stubbornly unchanged.
+    """
+    from pathlib import Path
+
+    css = (Path(__file__).resolve().parents[1] / ".streamlit" / "styles.css").read_text(
+        encoding="utf-8"
+    )
+    assert re.search(r"html\s*\{[^}]*font-size:\s*112\.5%", css), "root type scale missing"
+
+    absolute = [
+        size for size in re.findall(r"font-size:\s*([^;]+);", css)
+        if re.search(r"\d\s*(px|pt)\b", size)
+    ]
+    assert not absolute, f"font sizes must be rem so the root scale reaches them: {absolute}"
+
+
+def test_motion_respects_prefers_reduced_motion():
+    """Motion is decoration here, so it must be fully switchable off."""
+    from pathlib import Path
+
+    css = (Path(__file__).resolve().parents[1] / ".streamlit" / "styles.css").read_text(
+        encoding="utf-8"
+    )
+    assert "@media (prefers-reduced-motion: reduce)" in css
+    # Anything animated needs to be reachable by that block.
+    assert "animation-duration: 0.01ms !important" in css
+    assert "transition-duration: 0.01ms !important" in css
+
+
+def test_dark_theme_defines_its_own_hover_lift():
+    """A light-theme drop shadow is invisible on a dark surface."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1] / ".streamlit"
+    assert "--tc-lift" in (root / "styles.css").read_text(encoding="utf-8")
+    assert "--tc-lift" in (root / "styles-dark.css").read_text(encoding="utf-8"), (
+        "dark mode must override the hover lift or cards will not appear to raise"
+    )
+
+
+def test_charts_are_interactive_not_static():
+    """Hover-dim and legend filtering must be in the spec, resolved by Vega."""
+    import pandas as pd
+
+    from ui.views.dashboard import _donut
+
+    frame = pd.DataFrame({"Channel": ["Email", "Chat"], "Tickets": [3, 5]})
+    spec = _donut(frame, "Channel", "Tickets").to_dict()
+
+    params = spec.get("params", [])
+    assert params, "chart carries no selection params — it is static"
+    assert any(p.get("bind") == "legend" for p in params), "legend must be clickable"
+    assert any("mouseover" in str(p.get("select", "")) for p in params), "hover missing"
+    # The dim is what makes the selection visible at all.
+    assert "opacity" in spec.get("encoding", {})
+
+
+# --- "How priority is decided" explainer --------------------------------------
+# The whole value of this panel is that it cannot lie about the scorer. These
+# tests pin that property, not the wording: every number it shows is read from
+# `src.rule_scorer` / `src.schema`, so retuning the scorer updates the panel and
+# a hand-edited copy would fail here.
+def test_score_bands_are_the_bands_from_score_actually_uses():
+    from src.schema import SCORE_BANDS, Category
+
+    # The cutoffs used to be inline literals in `from_score`. Anything that
+    # displays them must agree with what the scorer applies.
+    for category, floor in SCORE_BANDS:
+        assert Category.from_score(floor) is category, f"{floor} should be {category}"
+        if floor > 0:
+            below = Category.from_score(floor - 1)
+            assert below is not category, f"{floor - 1} should not still be {category}"
+
+
+def test_safety_net_floor_is_the_high_band_floor():
+    """The net assigns High, so the score it hands out must mean High."""
+    from src.rule_scorer import HIGH_FLOOR
+    from src.schema import SCORE_BANDS, Category
+
+    high_floor = next(f for c, f in SCORE_BANDS if c is Category.HIGH)
+    assert HIGH_FLOOR == high_floor
+    assert Category.from_score(HIGH_FLOOR) is Category.HIGH
+
+
+def test_explainer_reference_is_read_from_the_scorer():
+    from src import rule_scorer as rs
+    from ui import domain
+
+    ref = domain.scorer_reference()
+    assert ref["base"] == rs.BASE_SCORE
+    assert ref["safety_net_floor"] == rs.HIGH_FLOOR
+
+    # Bands must tile the 0-100 range with no gap and no overlap.
+    bands = ref["bands"]
+    assert bands[0]["ceiling"] == 100
+    assert bands[-1]["floor"] == 0
+    for upper, lower in zip(bands, bands[1:]):
+        assert lower["ceiling"] == upper["floor"] - 1, "score bands must be contiguous"
+
+    # Every hard trigger group must appear in the critical tier, since presence of
+    # any of them is what forces escalation.
+    critical = next(t for t in ref["tiers"] if t["forces_escalation"])
+    names = {g["name"] for g in critical["groups"]}
+    assert set(rs.HARD_TRIGGERS) <= names
+    assert {g["name"] for g in ref["hard_triggers"]} == set(rs.HARD_TRIGGERS)
+
+
+def test_safety_net_stats_show_the_invariant_holding():
+    """No ticket the net touched may sit below High. That is the guarantee."""
+    from src.schema import Category
+    from ui import domain
+
+    stats = domain.safety_net_stats()
+    if not stats["total"]:
+        pytest.skip("no data loaded")
+
+    assert stats["fired"] > 0
+    below = {
+        name: count for name, count in stats["by_category"].items()
+        if name not in (Category.CRITICAL.value, Category.HIGH.value) and count
+    }
+    assert not below, f"safety net left tickets below High: {below}"
+    assert sum(stats["by_category"].values()) == stats["fired"]
+
+
+def test_worked_example_arithmetic_adds_up():
+    from ui import domain
+
+    # A hard trigger with little other keyword mass: the case the net exists for.
+    example = domain.scorer_worked_example("The billing system is down.")
+    assert example["raw"] == example["base"] + sum(l["weight"] for l in example["lines"])
+    assert example["safety_net_triggered"]
+    assert example["lifted_by_net"], "this example should demonstrate the net lifting"
+    assert example["score"] > example["raw"]
+    assert example["category"] == "High"
+    assert any(line["hard"] for line in example["lines"])
+
+    # And a plain question must not trip any of it.
+    calm = domain.scorer_worked_example("How do I export my report to PDF?")
+    assert not calm["safety_net_triggered"]
+    assert not calm["lifted_by_net"]
+    assert calm["score"] == calm["raw"]
+
+
+def test_safety_net_page_renders_the_explainer():
+    at = AppTest.from_string(
+        "from ui.views import tickets\ntickets.render_safety_net()\n", default_timeout=120
+    ).run()
+    assert not at.exception, at.exception
+    body = _html(at)
+    assert "tc-explain__net" in body, "the safety-net explanation must render"
+    assert "tc-explain__row" in body, "the bands/weights rows must render"
+    # The live figures, not a transcribed sentence.
+    assert "guarantee about vocabulary" in body
+
+
 # Every module under src/ does `from src.… import …`, so running one as a file
 # path puts src/ on sys.path instead of the repo root and raises
 # ModuleNotFoundError. The README's own step 1, data_prep's docstring, the

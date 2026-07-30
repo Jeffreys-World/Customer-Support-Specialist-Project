@@ -60,6 +60,13 @@
   --tc-note-head: #E8B96B;
 
   --tc-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.25);
+
+  /* Hover lift, dark. A shadow cannot read as elevation against a dark canvas —
+     there is nothing for it to darken. So the dark theme lifts a card by adding
+     light at its edge instead: an inset hairline plus a deeper drop. Same
+     perceived direction, opposite mechanism. */
+  --tc-lift: 0 0 0 1px rgba(255, 255, 255, 0.09) inset,
+             0 2px 6px rgba(0, 0, 0, 0.5), 0 10px 24px rgba(0, 0, 0, 0.4);
 }
 
 /* ----------------------------------------------------------------------------

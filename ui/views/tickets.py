@@ -148,10 +148,26 @@ def render_safety_net() -> None:
     """Only tickets the Critical-class safety net escalated.
 
     This is the project's most important correctness rule, so it gets its own
-    destination rather than being buried behind a checkbox.
+    destination rather than being buried behind a checkbox — and, since this is
+    the page about the mechanism, the explanation of how the scorer assigns
+    priority lives here too, in a collapsed expander above the queue.
+
+    Collapsed by default deliberately. An agent working this page wants the
+    tickets; the explanation is for the first visit and for anyone asking why a
+    ticket was escalated, so it must be one click away but never in the way.
     """
     def _list(tickets: List[Dict]) -> None:
         escalated = [t for t in tickets if t.get("safety_net_triggered")]
+        with st.expander("How priority is decided, and what the safety net does", expanded=False):
+            c.scorer_explainer(
+                domain.scorer_reference(),
+                domain.safety_net_stats(),
+                # A hard trigger with almost no other keyword mass, so the example
+                # shows the net doing the one thing it exists to do: 28 + 30 = 58
+                # is Medium, and it still leaves as High. This is Jordan's billing
+                # incident in one sentence (PROJECT_PLAN.md §1).
+                domain.scorer_worked_example("The billing system is down."),
+            )
         render_queue(
             escalated,
             "Safety-net escalations",

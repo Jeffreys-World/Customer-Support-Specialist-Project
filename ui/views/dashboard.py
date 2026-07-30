@@ -38,6 +38,7 @@ colours come from :func:`ui.theme.chart_colors` and the tokens' literal hex.
 from __future__ import annotations
 
 import re
+from typing import Optional
 
 import altair as alt
 import pandas as pd
@@ -111,6 +112,42 @@ def _style(chart: alt.Chart) -> alt.Chart:
     )
 
 
+def _interactive(chart: alt.Chart, legend_field: Optional[str] = None) -> alt.Chart:
+    """Add hover-dim and click-a-legend-to-isolate to a chart.
+
+    Vega-Lite resolves both of these in the browser from the chart spec, so this
+    is real interaction with no JavaScript of ours and no Streamlit rerun — which
+    matters, because a rerun would rebuild the whole page to highlight one bar.
+    (``ui.theme.inject_css`` covers why running our own JS is not an option here.)
+
+    The predicate is an **and**, not an or, and that is the whole subtlety. Both
+    selections are declared ``empty=True``, meaning "matches everything when
+    nothing is selected" — that is what keeps a chart at full opacity on arrival.
+    Or-ing them together would leave the idle selection permanently satisfying the
+    condition, so every mark would stay fully opaque and the hover would appear to
+    do nothing. And-ing gives the intended behaviour in all four states: idle
+    (both match, everything opaque), hovering (only that mark), legend filtered
+    (only that series), and both at once (the intersection).
+    """
+    hover = alt.selection_point(on="mouseover", empty=True, clear="mouseout")
+    params = [hover]
+    predicate = hover
+
+    if legend_field:
+        # `bind="legend"` makes the legend itself the control: click an entry to
+        # isolate that series, click away to clear. Shift-click adds to it.
+        isolate = alt.selection_point(fields=[legend_field], bind="legend", empty=True)
+        params.append(isolate)
+        predicate = hover & isolate
+
+    return chart.add_params(*params).encode(
+        # 0.28 rather than something subtler: at four near-equal categories the
+        # dimmed marks have to drop far enough that the highlighted one reads
+        # instantly, which is the entire point of the affordance.
+        opacity=alt.condition(predicate, alt.value(1.0), alt.value(0.28))
+    )
+
+
 def _chart(chart: alt.Chart) -> None:
     """Render a styled chart.
 
@@ -133,21 +170,23 @@ def _bar(frame: pd.DataFrame, x: str, y: str, color: str = None,
         enc["y"] = alt.Y(f"{y}:Q", title=y_title)
     if color:
         enc["color"] = color
-    return alt.Chart(frame).mark_bar(cornerRadius=3).encode(
+    chart = alt.Chart(frame).mark_bar(cornerRadius=3).encode(
         tooltip=list(frame.columns), **enc
     )
+    return _interactive(chart)
 
 
 def _donut(frame: pd.DataFrame, category: str, value: str) -> alt.Chart:
     """A donut rather than a pie: the hole makes near-equal slices easier to
     compare by arc length, and this dataset's categories are all near-equal."""
-    return alt.Chart(frame).mark_arc(innerRadius=55, stroke=None).encode(
+    chart = alt.Chart(frame).mark_arc(innerRadius=55, stroke=None).encode(
         theta=alt.Theta(f"{value}:Q", stack=True),
         color=alt.Color(f"{category}:N", title=None,
                         scale=alt.Scale(scheme="tableau10"),
                         legend=alt.Legend(orient="right")),
         tooltip=[category, value],
     )
+    return _interactive(chart, legend_field=category)
 
 
 def _counts_frame(mapping: dict, key: str, value: str = "Tickets") -> pd.DataFrame:
@@ -213,14 +252,17 @@ def _volume_charts(frame: pd.DataFrame) -> None:
                 .size().reset_index(name="Tickets")
                 .rename(columns={"ticket_type": "Type", "true_priority": "Priority"})
             )
-            chart = alt.Chart(grouped).mark_bar(cornerRadius=2).encode(
-                x=alt.X("Type:N", title=None, axis=alt.Axis(labelAngle=-25)),
-                y=alt.Y("Tickets:Q", title="Tickets"),
-                color=alt.Color("Priority:N", title="Priority",
-                                scale=alt.Scale(domain=PRIORITY_ORDER, range=PRIORITY_RANGE),
-                                sort=PRIORITY_ORDER),
-                xOffset=alt.XOffset("Priority:N", sort=PRIORITY_ORDER),
-                tooltip=["Type", "Priority", "Tickets"],
+            chart = _interactive(
+                alt.Chart(grouped).mark_bar(cornerRadius=2).encode(
+                    x=alt.X("Type:N", title=None, axis=alt.Axis(labelAngle=-25)),
+                    y=alt.Y("Tickets:Q", title="Tickets"),
+                    color=alt.Color("Priority:N", title="Priority",
+                                    scale=alt.Scale(domain=PRIORITY_ORDER, range=PRIORITY_RANGE),
+                                    sort=PRIORITY_ORDER),
+                    xOffset=alt.XOffset("Priority:N", sort=PRIORITY_ORDER),
+                    tooltip=["Type", "Priority", "Tickets"],
+                ),
+                legend_field="Priority",
             ).properties(height=280)
             _chart(chart)
             st.caption(
@@ -445,7 +487,11 @@ def render() -> None:
     c.priority_bar(counts)
     st.caption(
         "The AI scorer's output distribution across the loaded batch. Source: "
-        f"`{domain.active_data_source().name if domain.active_data_source() else 'none'}`."
+        f"`{domain.active_data_source().name if domain.active_data_source() else 'none'}`. "
+        "How these four bands are assigned — the keyword weights, the score "
+        "thresholds, and the Critical-class safety net that can override them — is "
+        "explained on **Safety-net escalations**. Hover any chart below to isolate a "
+        "series; click a legend entry to filter to it."
     )
     st.html("<div style='height:.7rem'></div>")
 

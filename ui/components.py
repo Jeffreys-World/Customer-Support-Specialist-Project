@@ -403,6 +403,165 @@ def profile_menu(name: str = "Jordan Rivera", role: str = "Support Specialist",
                 st.caption(notice)
 
 
+def scorer_explainer(
+    reference: Dict[str, object],
+    stats: Dict[str, object],
+    example: Optional[Dict[str, object]] = None,
+) -> None:
+    """"How priority is decided" — the scoring rules and the Critical-class safety net.
+
+    Takes the rules as data (``ui.domain.scorer_reference``) rather than reaching
+    into the scorer itself, so this function only decides how the explanation
+    *looks*. Every number below arrives from the scorer's own constants: nothing
+    here is a transcribed copy that could disagree with the code.
+
+    Ordered the way a question actually arrives. An agent looking at a queue asks
+    "why is this one Critical?", so: the score bands first (what the number
+    means), then the keyword weights (where the number comes from), then the
+    safety net (the rule that can override the number), then one worked example
+    with the arithmetic showing.
+    """
+    bands: List[Dict] = reference["bands"]          # type: ignore[assignment]
+    tiers: List[Dict] = reference["tiers"]          # type: ignore[assignment]
+
+    st.html(
+        '<div class="tc-explain">'
+        '<p class="tc-explain__lede">Every ticket is scored from its own text before '
+        'an agent sees it. No machine learning, no model call: the scorer counts '
+        'keyword matches, adds their weights, and the total lands in one of four '
+        'bands. The same text always produces the same score, and every point is '
+        'traceable to a phrase in the ticket.</p></div>'
+    )
+
+    # --- 1. What the number means ---------------------------------------------
+    panel_title("1 · The four bands")
+    rows = "".join(
+        f'<div class="tc-explain__row">'
+        f'<span class="tc-explain__range">{band["floor"]}–{band["ceiling"]}</span>'
+        f'{priority_pill_html(band["category"])}'
+        f'<span class="tc-explain__note">respond within {band["sla_hours"]}h</span>'
+        f"</div>"
+        for band in bands
+    )
+    st.html(f'<div class="tc-explain">{rows}</div>')
+    st.caption(
+        f"Scores run {reference['base']}–{reference['max']}. Every ticket starts at "
+        f"**{reference['base']}** — the neutral baseline — so a ticket with no "
+        "recognised keyword at all sits in the lowest band rather than at zero."
+    )
+
+    # --- 2. Where the number comes from ---------------------------------------
+    panel_title("2 · What the keywords are worth")
+    tier_rows = []
+    for tier in tiers:
+        groups: List[Dict] = tier["groups"]  # type: ignore[assignment]
+        phrases = sum(int(g["count"]) for g in groups)
+        sample = ", ".join(str(g["name"]) for g in groups[:6])
+        more = f" +{len(groups) - 6} more" if len(groups) > 6 else ""
+        tier_rows.append(
+            f'<div class="tc-explain__row">'
+            f'<span class="tc-explain__weight">+{tier["weight"]}</span>'
+            f'<span class="tc-explain__tier">{esc(tier["label"])}'
+            f'<span class="tc-explain__note"> {len(groups)} signal groups, '
+            f"{phrases} phrases</span></span>"
+            f'<span class="tc-explain__sample">{esc(sample)}{esc(more)}</span>'
+            f"</div>"
+        )
+    repeat = reference["repeat"]
+    tier_rows.append(
+        f'<div class="tc-explain__row">'
+        f'<span class="tc-explain__weight">+{repeat["weight"]}</span>'  # type: ignore[index]
+        f'<span class="tc-explain__tier">Repeat contact'
+        f'<span class="tc-explain__note"> once only, '
+        f'{len(repeat["variants"])} phrases</span></span>'  # type: ignore[index,arg-type]
+        f'<span class="tc-explain__sample">"again", "still not", "third time"</span>'
+        f"</div>"
+    )
+    st.html(f'<div class="tc-explain">{"".join(tier_rows)}</div>')
+    st.caption(
+        "A signal group fires at most once no matter how many of its phrases "
+        "appear, so repeating a word cannot inflate a score. Weights are "
+        "deliberately coarse: the scale only has to separate four bands, and "
+        "finer weights would imply a precision the keyword lists do not have."
+    )
+
+    # --- 3. The rule that can override the number ------------------------------
+    hard: List[Dict] = reference["hard_triggers"]  # type: ignore[assignment]
+    trigger_names = ", ".join(str(g["name"]) for g in hard)
+    by_category: Dict[str, int] = stats["by_category"]  # type: ignore[assignment]
+    below = sum(
+        count for name, count in by_category.items()
+        if name not in (Category.CRITICAL.value, Category.HIGH.value)
+    )
+    st.html(
+        '<div class="tc-explain__net">'
+        '<div class="tc-explain__net-head">3 · The Critical-class safety net</div>'
+        "<p>The costliest failure in triage is not a routine ticket read as urgent. "
+        "It is an urgent ticket read as routine, sitting in a queue while the "
+        "customer waits. So the score is not the last word.</p>"
+        f"<p><strong>Any ticket containing a hard-trigger phrase is forced to at "
+        f'least {esc(reference["safety_net_category"])}, whatever it scored.</strong> '
+        f'There are {len(hard)} hard-trigger groups: <em>{esc(trigger_names)}</em>. '
+        f'A ticket the net catches is lifted to a score of '
+        f'{reference["safety_net_floor"]}, the floor of that band.</p>'
+        f"<p>This is a guarantee about vocabulary, not a prediction, which is why "
+        f"it is stated as a rule rather than an accuracy figure. On the batch "
+        f'loaded right now it fired on <code>{stats["fired"]:,}</code> of '
+        f'<code>{stats["total"]:,}</code> tickets '
+        f'({float(stats["rate"]) * 100:.1f}%), and lifted '
+        f'<code>{stats["lifted_to_floor"]:,}</code> of those from below the line. '
+        f"Of every ticket it touched, <code>{below}</code> ended up below "
+        f'{esc(reference["safety_net_category"])} — the invariant holds, measured '
+        f"on every render rather than asserted.</p>"
+        "<p>The trade is deliberate and it costs precision: the net over-fires to "
+        "High on some routine tickets. A false alarm wastes a minute of an agent's "
+        "time. A missed critical ticket costs a customer.</p>"
+        "</div>"
+    )
+
+    # --- 4. The arithmetic, on one real sentence -------------------------------
+    if example:
+        panel_title("4 · A worked example")
+        lines = "".join(
+            f'<div class="tc-explain__row">'
+            f'<span class="tc-explain__weight">+{line["weight"]}</span>'
+            f'<span class="tc-explain__tier">{esc(line["signal"])}'
+            + ('<span class="tc-explain__hard">hard trigger</span>' if line["hard"] else "")
+            + "</span></div>"
+            for line in example["lines"]  # type: ignore[union-attr]
+        )
+        outcome = (
+            f'keyword mass alone reached {example["raw"]}, which is '
+            f'{example["category"]}'
+        )
+        if example["lifted_by_net"]:
+            outcome = (
+                f'keyword mass alone reached only <strong>{example["raw"]}</strong>, which '
+                f'would have been Medium. The safety net lifted it to '
+                f'<strong>{example["score"]}</strong> because "system down" is a hard '
+                f"trigger. This is the case the net exists for"
+            )
+        elif example["clamped"]:
+            outcome = (
+                f'the weights summed to {example["raw"]}, clamped to the '
+                f'{reference["max"]} maximum'
+            )
+        st.html(
+            f'<div class="tc-explain">'
+            f'<p class="tc-explain__quote">{esc(example["text"])}</p>'
+            f'<div class="tc-explain__row">'
+            f'<span class="tc-explain__weight">{example["base"]}</span>'
+            f'<span class="tc-explain__tier">starting baseline</span></div>'
+            f"{lines}"
+            f'<div class="tc-explain__row tc-explain__row--total">'
+            f'<span class="tc-explain__weight">{example["score"]}</span>'
+            f'<span class="tc-explain__tier">final score</span>'
+            f'{priority_pill_html(example["category"])}</div>'
+            f'<p class="tc-explain__note">So: {outcome}.</p>'
+            f"</div>"
+        )
+
+
 def priority_bar(counts: Dict[str, int]) -> None:
     """Four-up priority KPI row, always showing all four levels even at zero."""
     cols = st.columns(4)

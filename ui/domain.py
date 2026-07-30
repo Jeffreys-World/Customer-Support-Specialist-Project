@@ -202,6 +202,148 @@ def tickets_frame() -> "pd.DataFrame":
     return frame
 
 
+# --- How the scorer decides priority (backs the console's explainer) ----------
+
+def scorer_reference() -> Dict[str, object]:
+    """The scorer's own rules, read out of the scorer.
+
+    Backs the "How priority is decided" explainer. Every number, keyword and
+    threshold here is imported from :mod:`src.rule_scorer` and
+    :mod:`src.schema` rather than written out again, for the same reason
+    :func:`data_integrity` measures instead of transcribing: a hand-copied
+    weights table is wrong the first time anyone tunes the scorer, and an
+    explanation that is confidently wrong is worse than no explanation. Retune
+    the scorer and this panel re-renders correctly with no edit here.
+
+    Returned shape is deliberately plain dicts and lists, so the renderer does no
+    thinking and this is testable without Streamlit.
+    """
+    from src import rule_scorer as rs
+    from src.schema import SCORE_BANDS
+
+    def group(signals: Dict[str, List[str]]) -> List[Dict[str, object]]:
+        return [{"name": name, "variants": list(variants), "count": len(variants)}
+                for name, variants in signals.items()]
+
+    return {
+        "base": rs.BASE_SCORE,
+        "max": 100,
+        # Most urgent first, each with the score range that lands in it. The top
+        # band is open-ended at 100; the rest stop one below the next floor up.
+        "bands": [
+            {
+                "category": category.value,
+                "emoji": category.emoji,
+                "floor": floor,
+                "ceiling": (100 if index == 0 else SCORE_BANDS[index - 1][1] - 1),
+                "sla_hours": SLA_HOURS[category],
+            }
+            for index, (category, floor) in enumerate(SCORE_BANDS)
+        ],
+        # Weight tiers, heaviest first. `hard` and `extra` share a weight: both
+        # are critical-strength keyword hits, and only `hard` also forces
+        # escalation, which is the distinction the explainer has to make clear.
+        "tiers": [
+            {"label": "Critical signals", "weight": rs.CRITICAL_WEIGHT,
+             "groups": group(rs.HARD_TRIGGERS) + group(rs.CRITICAL_EXTRA),
+             "forces_escalation": True},
+            {"label": "High signals", "weight": rs.HIGH_WEIGHT,
+             "groups": group(rs.HIGH_SIGNALS), "forces_escalation": False},
+            {"label": "Medium signals", "weight": rs.MEDIUM_WEIGHT,
+             "groups": group(rs.MEDIUM_SIGNALS), "forces_escalation": False},
+            {"label": "Low signals", "weight": rs.LOW_WEIGHT,
+             "groups": group(rs.LOW_SIGNALS), "forces_escalation": False},
+        ],
+        "hard_triggers": group(rs.HARD_TRIGGERS),
+        "repeat": {"weight": rs.REPEAT_WEIGHT, "variants": list(rs.REPEAT_SIGNALS)},
+        "safety_net_floor": rs.HIGH_FLOOR,
+        "safety_net_category": Category.HIGH.value,
+    }
+
+
+def scorer_worked_example(text: str) -> Dict[str, object]:
+    """Run one sentence through the real scorer and return the arithmetic.
+
+    The explainer's tables state the rules; this shows them producing a number, so
+    a reader can check the addition themselves. It calls :func:`score_ticket` — the
+    same function the batch job uses — rather than reproducing the sum, which means
+    the example cannot claim a total the scorer would not actually give.
+    """
+    from src.rule_scorer import (
+        CRITICAL_EXTRA, CRITICAL_WEIGHT, HARD_TRIGGERS, HIGH_SIGNALS, HIGH_WEIGHT,
+        LOW_SIGNALS, LOW_WEIGHT, MEDIUM_SIGNALS, MEDIUM_WEIGHT, REPEAT_WEIGHT,
+        BASE_SCORE, score_ticket,
+    )
+    from src.schema import Ticket
+
+    scored = score_ticket(Ticket(id="example", subject="", body=text))
+
+    # Attribute each fired signal back to the weight that produced it, so the
+    # breakdown lines add up to the score shown beside them.
+    weights = [
+        (HARD_TRIGGERS, CRITICAL_WEIGHT, True),
+        (CRITICAL_EXTRA, CRITICAL_WEIGHT, False),
+        (HIGH_SIGNALS, HIGH_WEIGHT, False),
+        (MEDIUM_SIGNALS, MEDIUM_WEIGHT, False),
+        (LOW_SIGNALS, LOW_WEIGHT, False),
+    ]
+    lines: List[Dict[str, object]] = []
+    for name in scored.matched_signals:
+        if name == "repeat-contact":
+            lines.append({"signal": name, "weight": REPEAT_WEIGHT, "hard": False})
+            continue
+        for group, weight, hard in weights:
+            if name in group:
+                lines.append({"signal": name, "weight": weight, "hard": hard})
+                break
+
+    from src.rule_scorer import HIGH_FLOOR
+
+    # What the keywords alone add up to, before the 0-100 clamp and before the net.
+    raw = BASE_SCORE + sum(int(line["weight"]) for line in lines)
+    return {
+        "text": text,
+        "base": BASE_SCORE,
+        "lines": lines,
+        "raw": raw,
+        "score": scored.score,
+        "category": scored.category.value,
+        "safety_net_triggered": scored.safety_net_triggered,
+        # Two different things, and the explainer shows them differently:
+        "clamped": raw > 100,
+        # ...and this is the one that demonstrates the net doing work — keyword
+        # mass alone left it below High, and the net is what lifted it.
+        "lifted_by_net": scored.safety_net_triggered and min(raw, 100) < HIGH_FLOOR,
+    }
+
+
+def safety_net_stats() -> Dict[str, object]:
+    """How often the safety net actually fired on the loaded batch.
+
+    The explainer states a rule; this is the evidence that the rule ran. Measured
+    from the batch on every render, so it cannot go stale the way a figure quoted
+    from a one-off analysis would.
+    """
+    from src.rule_scorer import HIGH_FLOOR
+
+    tickets = load_tickets()
+    total = len(tickets)
+    fired = [t for t in tickets if t.get("safety_net_triggered")]
+    lifted = [t for t in fired if int(t.get("score", 0)) == HIGH_FLOOR]
+    return {
+        "total": total,
+        "fired": len(fired),
+        "rate": len(fired) / total if total else 0.0,
+        # Tickets sitting exactly at the floor are the ones the net actually
+        # rescued: their keyword mass alone put them below High.
+        "lifted_to_floor": len(lifted),
+        "by_category": {
+            category.value: sum(1 for t in fired if t.get("category") == category.value)
+            for category in Category
+        },
+    }
+
+
 # --- Field completeness -------------------------------------------------------
 
 # Which ``status`` values are expected to populate each partially-filled
