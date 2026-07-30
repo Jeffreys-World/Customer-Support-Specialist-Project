@@ -7,10 +7,15 @@ tab strip above and the composer below.
 What is real and what is not:
 
 * **Real** — priority, score, matched signals, safety-net state, suggested queue,
-  ground-truth labels, tags, the ticket body, the AI rationale, and the agent's
-  confirm/override decision (which is written to ``results/override_log.csv``).
+  ground-truth labels, tags, the ticket body, ticket status, resolution state, the
+  AI rationale, and the agent's confirm/override decision (which is written to
+  ``results/override_log.csv``).
 * **Simulated** — requester identity, the agent reply turn, and interaction
   history. Each of those panels is rendered with a "simulated" badge (D1).
+* **Withheld** — the dataset's ``Resolution`` note text. The column is carried
+  through the pipeline and measured on the Dashboard, but it is generator filler
+  ("Case maybe show recently my computer follow."), so this panel shows resolution
+  *state* instead of printing prose that would read as a real agent's closing note.
 """
 
 from __future__ import annotations
@@ -114,6 +119,12 @@ def _properties(ticket: Dict) -> None:
             value_html=c.tags_html(signals, limit=8) if signals else "—",
         )
         c.field("Tags", None, value_html=c.tags_html(ticket.get("tags") or [], limit=8) or "—")
+        c.field("Status", ticket.get("status") or "—")
+        c.field("Resolution", domain.resolution_state(ticket))
+        st.caption(
+            "Resolution shows state, not the dataset's note text — those notes are "
+            "generator filler. Measured under Dashboard → Data integrity."
+        )
 
     with st.container(border=True):
         c.panel_title("Dataset labels")

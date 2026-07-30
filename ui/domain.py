@@ -16,7 +16,7 @@ import datetime as dt
 import hashlib
 import json
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, Tuple
 
 import streamlit as st
 
@@ -151,8 +151,17 @@ def filter_tickets(
 # `test_dashboard_survives_a_pre_swap_batch`.
 ANALYTICS_COLUMNS = [
     "subject", "true_priority", "status", "channel", "product", "ticket_type",
-    "csat", "first_response_at", "resolved_at", "purchase_date",
+    "csat", "first_response_at", "resolved_at", "resolution", "purchase_date",
 ]
+
+# Derived completeness flags added to the frame: flag name -> the column whose
+# blankness it reports. A mapping rather than two parallel lists so reordering
+# cannot silently pair a flag with the wrong column. Named after what they
+# measure — see `field_completeness` for why they are not "urgent"/"overdue".
+COMPLETENESS_FLAGS: Dict[str, str] = {
+    "awaiting_first_response": "first_response_at",
+    "unresolved": "resolved_at",
+}
 
 
 @st.cache_data
@@ -171,7 +180,9 @@ def tickets_frame() -> "pd.DataFrame":
 
     frame = pd.DataFrame(load_tickets())
     if frame.empty:
-        return pd.DataFrame(columns=ANALYTICS_COLUMNS + ["csat_value"])
+        return pd.DataFrame(
+            columns=ANALYTICS_COLUMNS + list(COMPLETENESS_FLAGS) + ["csat_value"]
+        )
 
     for column in ANALYTICS_COLUMNS:
         if column not in frame.columns:
@@ -179,8 +190,85 @@ def tickets_frame() -> "pd.DataFrame":
 
     # csat arrives as a string ("" for the ~67% of tickets that are not closed).
     frame["csat_value"] = pd.to_numeric(frame["csat"], errors="coerce")
+
+    # Completeness flags. These say only what they measure: no first-response
+    # timestamp is recorded, no resolution timestamp is recorded. They are
+    # deliberately not called "urgent" or "overdue" — `field_completeness` shows
+    # both blanks are a pure function of `status`, so a flag implying urgency
+    # would be dressing the status column up as a new signal. Overdue belongs to
+    # `sla_breached`, which is at least honest about its clock being simulated.
+    for flag, column in COMPLETENESS_FLAGS.items():
+        frame[flag] = frame[column].fillna("").astype(str).str.strip() == ""
     return frame
 
+
+# --- Field completeness -------------------------------------------------------
+
+# Which ``status`` values are expected to populate each partially-filled
+# operational field. This is a claim about the data, so `field_completeness`
+# re-verifies it against the loaded batch on every call instead of trusting the
+# comment — if a future dataset breaks the pattern, the panel says so.
+COMPLETENESS_FIELDS: Dict[str, Tuple[str, ...]] = {
+    "first_response_at": ("Closed", "Pending Customer Response"),
+    "resolved_at": ("Closed",),
+    "resolution": ("Closed",),
+    "csat": ("Closed",),
+}
+
+
+def resolution_state(ticket: Dict) -> str:
+    """Display label for a ticket's resolution, so the field is never just blank.
+
+    Three states rather than two, because "no note" and "not yet resolved" are
+    different facts and a batch generated before the ``resolution`` passthrough
+    has the first without the second.
+    """
+    if str(ticket.get("resolution", "") or "").strip():
+        return "Resolved"
+    if str(ticket.get("status", "") or "").strip() == "Closed":
+        return "Closed, no note recorded"
+    return "Not yet resolved"
+
+
+def field_completeness() -> List[Dict[str, object]]:
+    """Fill rate per partially-populated field, and whether ``status`` explains it.
+
+    This is the honest form of a "missing first response" flag. The tempting
+    version of that flag — *no first-response timestamp AND status is Open* —
+    fires on exactly the Open tickets and nothing else, so it restates the status
+    column under a name ("urgent", "needs response") that implies new
+    information. Rather than ship that, this measures the redundancy and reports
+    it: ``explained_by_status`` is True when a field's blanks are perfectly
+    predicted by status, which on this dataset is true for all four fields.
+
+    Consequence worth stating plainly: no "days open" or "overdue" metric can be
+    built from these blanks. The dataset carries no ticket-creation timestamp at
+    all (only ``purchase_date``, which precedes every ticket by years), which is
+    why `simulated_age_hours` exists and labels itself a demo clock.
+    """
+    frame = tickets_frame()
+    if frame.empty:
+        return []
+
+    status = frame["status"].fillna("").astype(str).str.strip()
+    rows: List[Dict[str, object]] = []
+    for column, populating in COMPLETENESS_FIELDS.items():
+        filled = frame[column].fillna("").astype(str).str.strip() != ""
+        expected = status.isin(populating)
+        rows.append({
+            "field": column,
+            "filled": int(filled.sum()),
+            "blank": int((~filled).sum()),
+            "total": int(len(frame)),
+            "coverage": float(filled.mean()),
+            "populating_status": list(populating),
+            "mismatches": int((filled != expected).sum()),
+            "explained_by_status": bool((filled == expected).all()),
+        })
+    return rows
+
+
+# --- Dashboard analytics, continued -------------------------------------------
 
 def count_by(column: str) -> Dict[str, int]:
     """Value counts for one column, descending. Empty strings are dropped."""
@@ -233,6 +321,18 @@ def status_summary() -> Dict[str, object]:
     }
 
 
+# Vocabulary a genuine support resolution note would be expected to draw on. Used
+# only to measure whether this dataset's `Resolution` column does — it is not a
+# scoring signal and must never become one (the scorer reads `rule_scorer`'s sets
+# and nothing else).
+SUPPORT_TERMS: Tuple[str, ...] = (
+    "refund", "replac", "account", "order", "ship", "return", "charge", "bill",
+    "password", "reset", "warrant", "repair", "install", "updat", "driver",
+    "setting", "support", "resolv", "fix", "troubleshoot", "escalat", "credit",
+    "invoice", "subscription",
+)
+
+
 def data_integrity() -> Dict[str, object]:
     """Measured data-quality facts backing the Dashboard's integrity panel.
 
@@ -253,6 +353,10 @@ def data_integrity() -> Dict[str, object]:
         "timestamp_inverted": 0,
         "timestamp_inverted_rate": 0.0,
         "response_days": 0,
+        "resolution_notes": 0,
+        "resolution_unique": 0,
+        "resolution_mentions_product": 0,
+        "resolution_domain_terms": 0,
         "csat": csat_summary(),
     }
     if frame.empty:
@@ -274,6 +378,25 @@ def data_integrity() -> Dict[str, object]:
     out["timestamp_inverted_rate"] = inverted / pair_count if pair_count else 0.0
     spread = first.dropna()
     out["response_days"] = int(spread.dt.normalize().nunique()) if len(spread) else 0
+
+    # 3. Is the closing note actually about the ticket it closes? Two cheap,
+    #    falsifiable checks: does it use any support vocabulary at all, and does
+    #    it ever name the product it supposedly fixed. Both come out near zero,
+    #    which is why the workspace shows resolution *state* and not this prose.
+    notes = frame["resolution"].fillna("").astype(str).str.strip()
+    present = notes[notes != ""]
+    out["resolution_notes"] = int(len(present))
+    if len(present):
+        out["resolution_unique"] = int(present.nunique())
+        lowered = present.str.lower()
+        out["resolution_domain_terms"] = int(
+            lowered.apply(lambda note: any(term in note for term in SUPPORT_TERMS)).sum()
+        )
+        products = frame.loc[present.index, "product"].fillna("").astype(str)
+        out["resolution_mentions_product"] = int(sum(
+            1 for note, product in zip(lowered, products)
+            if product.strip() and product.split()[0].lower() in note
+        ))
 
     return out
 

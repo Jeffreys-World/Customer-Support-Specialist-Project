@@ -17,7 +17,8 @@ This script:
   4. drops rows with no usable text,
   5. maps ``Ticket Type`` onto the queue vocabulary the rationale layer speaks,
   6. synthesises a ``tags`` column from real dataset fields,
-  7. writes ``data/processed/tickets.csv`` with a stable ``id`` per ticket.
+  7. carries the raw ``Resolution`` note through as ``resolution`` (see below),
+  8. writes ``data/processed/tickets.csv`` with a stable ``id`` per ticket.
 
 Run:  ``python src/data_prep.py``  (add ``--input`` to point at a different CSV).
 
@@ -31,6 +32,22 @@ broken. We substitute the row's real ``Product Purchased`` value, which is both
 closer to a genuine ticket and honest: the product name is real dataset content,
 not invented. This does change the text the scorer reads, so evaluation numbers
 must be computed after substitution, never carried over from the raw text.
+
+## The resolution note
+
+``Resolution`` is one of the few genuinely free-text, genuinely human columns in
+this dataset, and it was previously dropped on the floor here. It is populated for
+exactly the 2,769 ``Closed`` tickets and empty for every ``Open`` and ``Pending
+Customer Response`` one — a perfect function of ``Ticket Status``, verified rather
+than assumed. Carrying it through gives the ticket workspace something real to show
+for a closed ticket instead of a blank field.
+
+It is carried as the **raw text, empty when absent**, not filled with a
+``"Not Yet Resolved"`` sentinel. A sentinel in a free-text column would be counted
+as a resolution by anything aggregating the column, and would break the
+empty-string convention every other operational field here follows (see
+:class:`src.schema.Ticket`). The "not yet resolved" wording is a display concern
+and lives in :func:`ui.domain.resolution_state`.
 
 ## A warning about this dataset's labels
 
@@ -78,7 +95,7 @@ TYPE_TO_QUEUE = {
 OUTPUT_COLUMNS = [
     "id", "subject", "body", "priority", "queue",
     "status", "channel", "product", "ticket_type",
-    "csat", "first_response_at", "resolved_at", "purchase_date",
+    "csat", "first_response_at", "resolved_at", "resolution", "purchase_date",
     "requester_name", "requester_email", "tags",
 ]
 
@@ -150,6 +167,7 @@ def prepare(input_path: Path, output_path: Path) -> pd.DataFrame:
     df["csat"] = df["Customer Satisfaction Rating"].fillna("").astype(str).str.strip()
     df["first_response_at"] = df["First Response Time"].fillna("").astype(str).str.strip()
     df["resolved_at"] = df["Time to Resolution"].fillna("").astype(str).str.strip()
+    df["resolution"] = df["Resolution"].fillna("").astype(str).str.strip()
     df["purchase_date"] = df["Date of Purchase"].fillna("").astype(str).str.strip()
     df["requester_name"] = df["Customer Name"].fillna("").astype(str).str.strip()
     df["requester_email"] = df["Customer Email"].fillna("").astype(str).str.strip()
@@ -177,6 +195,9 @@ def _print_summary(total: int, after_label: int, out: pd.DataFrame) -> None:
         print(f"  {label:<9} {int(count)}")
     filled = int((~out["body"].str.contains(PLACEHOLDER, regex=False)).sum())
     print(f"Placeholder substituted in {filled}/{len(out)} descriptions.")
+    resolved = int((out["resolution"].str.strip() != "").sum())
+    closed = int((out["status"] == "Closed").sum())
+    print(f"Resolution note present on {resolved}/{len(out)} tickets ({closed} closed).")
 
 
 def main(argv: List[str] | None = None) -> int:

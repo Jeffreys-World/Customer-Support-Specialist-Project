@@ -364,6 +364,44 @@ def _integrity_panel() -> None:
             "rather than faked.</p>"
         )
 
+    notes = facts.get("resolution_notes", 0)
+    if notes:
+        parts.append(
+            "<p><strong>The resolution notes are generator filler.</strong> "
+            f"All <code>{notes:,}</code> closed tickets carry a note and "
+            f"<code>{facts.get('resolution_unique', 0):,}</code> of them are unique, but only "
+            f"<code>{facts.get('resolution_domain_terms', 0):,}</code> use any support "
+            "vocabulary at all (refund, account, replace, reset, …) and "
+            f"<code>{facts.get('resolution_mentions_product', 0):,}</code> mention the product "
+            "they supposedly fixed. They read like <em>“Case maybe show recently my "
+            "computer follow.”</em> The column is carried through the pipeline so it can be "
+            "measured here, but the ticket workspace shows resolution <em>state</em> rather "
+            "than printing this as an agent's closing note.</p>"
+        )
+
+    completeness = domain.field_completeness()
+    if completeness:
+        explained = [item for item in completeness if item["explained_by_status"]]
+        rows = "".join(
+            f"<li><code>{c.esc(item['field'])}</code> — "
+            f"{item['filled']:,}/{item['total']:,} populated ({item['coverage'] * 100:.1f}%), "
+            f"present exactly when status is {c.esc(' or '.join(item['populating_status']))}"
+            + ("" if item["explained_by_status"]
+               else f" <em>({item['mismatches']:,} exceptions)</em>")
+            + "</li>"
+            for item in completeness
+        )
+        parts.append(
+            "<p><strong>Every blank field is explained by <code>status</code> alone.</strong>"
+            f"<ul>{rows}</ul>"
+            f"{len(explained)} of {len(completeness)} fields match their status rule with zero "
+            "exceptions. So a “missing first response” flag would fire on exactly the Open "
+            "tickets and nothing else — it would rename a column, not add a signal. This also "
+            "rules out any <em>days open</em> or <em>overdue</em> metric: the dataset carries no "
+            "ticket-creation timestamp, only a purchase date that precedes every ticket by "
+            "years. The queue's SLA clock is a hash-derived demo age and says so.</p>"
+        )
+
     csat = facts.get("csat") or {}
     if csat.get("total"):
         parts.append(

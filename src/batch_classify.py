@@ -69,6 +69,7 @@ def load_tickets(path: Path) -> List[Ticket]:
                     csat=row.get("csat", ""),
                     first_response_at=row.get("first_response_at", ""),
                     resolved_at=row.get("resolved_at", ""),
+                    resolution=row.get("resolution", ""),
                     purchase_date=row.get("purchase_date", ""),
                     requester_name=row.get("requester_name", ""),
                     requester_email=row.get("requester_email", ""),

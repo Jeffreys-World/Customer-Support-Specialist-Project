@@ -286,6 +286,84 @@ def test_dashboard_integrity_panel_is_computed_from_the_batch():
     assert 0 < facts["csat"]["coverage"] < 1, "CSAT should cover only closed tickets"
 
 
+# The `resolution` passthrough and the completeness flags. Both exist to replace a
+# tempting-but-empty "urgent response / overdue" flag pair with something measured,
+# so the tests pin the measurement rather than just the plumbing.
+def test_resolution_is_carried_through_for_closed_tickets_only():
+    from ui import domain
+
+    tickets = domain.load_tickets()
+    if not tickets:
+        pytest.skip("no data loaded")
+
+    with_note = [t for t in tickets if str(t.get("resolution", "")).strip()]
+    closed = [t for t in tickets if t.get("status") == "Closed"]
+    assert with_note, "resolution column missing from the batch — rerun batch_classify"
+    # A note on a ticket that isn't closed would mean the passthrough picked up
+    # the wrong column.
+    assert {t["id"] for t in with_note} == {t["id"] for t in closed}
+
+
+def test_resolution_state_labels_all_three_cases():
+    from ui.domain import resolution_state
+
+    assert resolution_state({"resolution": "Fixed the billing error.", "status": "Closed"}) == "Resolved"
+    assert resolution_state({"resolution": "", "status": "Closed"}) == "Closed, no note recorded"
+    assert resolution_state({"resolution": "", "status": "Open"}) == "Not yet resolved"
+    # A batch predating the passthrough has no key at all.
+    assert resolution_state({"status": "Open"}) == "Not yet resolved"
+
+
+def test_completeness_flags_say_only_what_they_measure():
+    from ui import domain
+
+    frame = domain.tickets_frame()
+    if frame.empty:
+        pytest.skip("no data loaded")
+
+    # Each flag must track its own mapped column, not the status column it
+    # happens to correlate with.
+    for flag, column in domain.COMPLETENESS_FLAGS.items():
+        assert flag in frame.columns
+        blank = frame[column].fillna("").astype(str).str.strip() == ""
+        assert frame[flag].equals(blank), f"{flag} does not report {column}"
+
+
+# This is the finding that replaced the plan's "Urgent Response" / "Overdue" flags:
+# the blanks those flags would have keyed on are a pure function of `status`, so the
+# flags would have renamed a column rather than added a signal. If a future dataset
+# breaks the pattern, this test fails and the flags become worth building for real.
+def test_blank_fields_are_fully_explained_by_status():
+    from ui import domain
+
+    completeness = domain.field_completeness()
+    if not completeness:
+        pytest.skip("no data loaded")
+
+    assert {item["field"] for item in completeness} == set(domain.COMPLETENESS_FIELDS)
+    for item in completeness:
+        assert item["explained_by_status"], (
+            f"{item['field']} has {item['mismatches']} blanks status does not explain — "
+            "a real completeness flag may now carry information and should be reconsidered"
+        )
+        assert 0 < item["coverage"] < 1, f"{item['field']} is not partially populated"
+
+
+def test_resolution_notes_are_measured_as_filler():
+    """The workspace withholds the note text on the strength of these numbers."""
+    from ui import domain
+
+    facts = domain.data_integrity()
+    if not facts["resolution_notes"]:
+        pytest.skip("no resolution notes in this batch")
+
+    notes = facts["resolution_notes"]
+    # Every note distinct, yet almost none about support and none about the product.
+    assert facts["resolution_unique"] == notes
+    assert facts["resolution_domain_terms"] / notes < 0.15
+    assert facts["resolution_mentions_product"] == 0
+
+
 # Regression: the Dashboard crashed with
 #   AttributeError: 'NoneType' object has no attribute 'notna'
 # against a batch generated before the dataset swap. `frame.get(missing)` returns
@@ -316,6 +394,14 @@ def test_dashboard_survives_a_pre_swap_batch(monkeypatch):
         assert facts["timestamp_inverted_rate"] == 0.0
         assert domain.count_by("channel") == {}   # no data, not a crash
         assert domain.csat_summary()["rated"] == 0
+        # A pre-swap batch has no resolution column and no status, so the note
+        # measurement and the completeness table must both report nothing found
+        # rather than dividing by zero or indexing a missing column.
+        assert facts["resolution_notes"] == 0
+        assert facts["resolution_mentions_product"] == 0
+        for item in domain.field_completeness():
+            assert item["filled"] == 0
+        assert domain.resolution_state(old_style[0]) == "Not yet resolved"
     finally:
         domain.tickets_frame.clear()
 

@@ -118,9 +118,9 @@ class Ticket:
     tags: List[str] = field(default_factory=list)
 
     # Operational fields carried straight through from the dataset. The dashboard
-    # reads these; the scorer never does. `csat`, `first_response_at` and
-    # `resolved_at` are only populated for closed tickets, so anything consuming
-    # them must handle the empty string.
+    # reads these; the scorer never does. `csat`, `first_response_at`,
+    # `resolved_at` and `resolution` are only populated for closed tickets, so
+    # anything consuming them must handle the empty string.
     status: str = ""
     channel: str = ""
     product: str = ""
@@ -128,6 +128,10 @@ class Ticket:
     csat: str = ""
     first_response_at: str = ""
     resolved_at: str = ""
+    # The agent's free-text closing note. Empty for anything not yet closed —
+    # `ui.domain.resolution_state` owns the label shown in that case, so no
+    # sentinel string is stored here.
+    resolution: str = ""
     purchase_date: str = ""
     requester_name: str = ""
     requester_email: str = ""
@@ -172,6 +176,7 @@ class ScoredTicket:
             "csat": self.ticket.csat,
             "first_response_at": self.ticket.first_response_at,
             "resolved_at": self.ticket.resolved_at,
+            "resolution": self.ticket.resolution,
             "purchase_date": self.ticket.purchase_date,
             "requester_name": self.ticket.requester_name,
             "requester_email": self.ticket.requester_email,
@@ -200,6 +205,7 @@ class ScoredTicket:
             csat=d.get("csat", ""),
             first_response_at=d.get("first_response_at", ""),
             resolved_at=d.get("resolved_at", ""),
+            resolution=d.get("resolution", ""),
             purchase_date=d.get("purchase_date", ""),
             requester_name=d.get("requester_name", ""),
             requester_email=d.get("requester_email", ""),
