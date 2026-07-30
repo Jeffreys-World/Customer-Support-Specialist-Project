@@ -34,7 +34,14 @@ from __future__ import annotations
 
 from typing import Dict, List, Tuple
 
-from src.schema import Category, ScoredTicket, Ticket
+from src.schema import SCORE_BANDS, Category, ScoredTicket, Ticket
+
+# The score the safety net lifts a ticket to. Derived from the High band's own
+# floor rather than written as 65, because those two numbers must agree by
+# definition: the net sets the category to High, so the score it reports has to
+# be a score that *means* High. As separate literals, retuning the band left the
+# net handing out a score one point below the category it had just assigned.
+HIGH_FLOOR = next(floor for category, floor in SCORE_BANDS if category is Category.HIGH)
 
 # --- Weights -----------------------------------------------------------------
 BASE_SCORE = 28
@@ -182,7 +189,7 @@ def score_ticket(ticket: Ticket) -> ScoredTicket:
     safety_net_triggered = bool(hard_hits)
     if safety_net_triggered and not category.at_least(Category.HIGH):
         category = Category.HIGH
-        score = max(score, 65)
+        score = max(score, HIGH_FLOOR)
 
     return ScoredTicket(
         ticket=ticket,

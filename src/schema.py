@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 
 class Category(str, Enum):
@@ -85,15 +85,30 @@ class Category(str, Enum):
 
     @classmethod
     def from_score(cls, score: int) -> "Category":
-        """Bucket a 0–100 urgency score into a category (PROJECT_PLAN.md §5)."""
-        if score >= 90:
-            return cls.CRITICAL
-        if score >= 65:
-            return cls.HIGH
-        if score >= 35:
-            return cls.MEDIUM
+        """Bucket a 0–100 urgency score into a category (PROJECT_PLAN.md §5).
+
+        Walks :data:`SCORE_BANDS` rather than carrying its own literals, so the
+        cutoffs the console explains to the user are by construction the cutoffs
+        actually applied here. They used to be inline `if score >= 90` branches,
+        which meant any UI that displayed them was a second copy free to drift.
+        """
+        for category, floor in SCORE_BANDS:
+            if score >= floor:
+                return category
         return cls.LOW
 
+
+# Inclusive lower bound of each category's score band, most urgent first.
+# :meth:`Category.from_score` walks this and the console's "how priority is
+# decided" explainer renders it, so there is exactly one place the 0–100 scale is
+# cut into four levels. Defined after the class because the values are Category
+# members; `from_score` reads it at call time, not at class-definition time.
+SCORE_BANDS: List[Tuple[Category, int]] = [
+    (Category.CRITICAL, 90),
+    (Category.HIGH, 65),
+    (Category.MEDIUM, 35),
+    (Category.LOW, 0),
+]
 
 # Canonical dataset priority labels, ordered least → most urgent. Identical to
 # the product scale now that the dataset carries a real Critical label.
