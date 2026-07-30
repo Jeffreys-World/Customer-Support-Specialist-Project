@@ -3,7 +3,7 @@
 Given a ticket and the rule-based scorer's verdict, this asks Claude to write a
 short, plain-language "why" and to suggest which queue the ticket belongs in.
 
-Two hard design rules (PROJECT_PLAN.md §3, §7):
+Three hard design rules (PROJECT_PLAN.md §3, §7):
 
   1. **Claude explains the score; it never re-decides it.** The category and
      numeric score come from ``rule_scorer`` and are passed in as fixed context.
@@ -12,6 +12,12 @@ Two hard design rules (PROJECT_PLAN.md §3, §7):
      batch job degrades to a deterministic rule-based fallback (``fallback_*``
      below), so the queue still sorts and the UI still renders. The LLM is a
      nice-to-have explanation layer, not a dependency.
+  3. **The model sees what the ticket is about, never who it is about.** Every
+     prompt is built from ``src.sanitize.sanitize_scored_ticket`` — an allowlist
+     of ``subject``/``body`` plus the scorer's verdict, with contact details
+     redacted out of the surviving prose. ``_build_user_prompt`` is handed that
+     dict rather than the ``Ticket``, so it cannot reach ``requester_name`` or
+     ``requester_email`` even by accident. Triage never needed identity.
 
 Model + structured output follow the current Anthropic SDK: the default model is
 ``claude-opus-4-8`` (override with ``ANTHROPIC_MODEL``), and the response is
@@ -27,6 +33,7 @@ import json
 import os
 from typing import List, Tuple
 
+from src.sanitize import sanitize_scored_ticket
 from src.schema import Category, ScoredTicket
 
 # Default to the most capable current model; override per-run with ANTHROPIC_MODEL
@@ -112,15 +119,19 @@ def get_client():
 
 
 def _build_user_prompt(scored: ScoredTicket) -> str:
-    t = scored.ticket
-    signals = ", ".join(scored.matched_signals) if scored.matched_signals else "none"
+    # Design rule 3: read the sanitized dict, never `scored.ticket`. Every field
+    # below has been through the allowlist, and the free-text ones through
+    # redaction. Reaching past `safe` to the raw ticket would silently reopen
+    # the leak this function exists to close.
+    safe = sanitize_scored_ticket(scored)
+    signals = ", ".join(safe.get("matched_signals") or []) or "none"
     net = " (Critical-class safety net was triggered by a hard-priority keyword.)" \
-        if scored.safety_net_triggered else ""
+        if safe.get("safety_net_triggered") else ""
     return (
-        f"Ticket subject: {t.subject}\n"
-        f"Ticket body: {t.body}\n\n"
+        f"Ticket subject: {safe.get('subject', '')}\n"
+        f"Ticket body: {safe.get('body', '')}\n\n"
         f"Rule-based verdict (fixed — do not change): "
-        f"category={scored.category.value}, score={scored.score}/100.{net}\n"
+        f"category={safe.get('category', '')}, score={safe.get('score', 0)}/100.{net}\n"
         f"Keyword signals the scorer matched: {signals}.\n\n"
         f"Write one or two short bullets explaining why this priority is "
         f"appropriate, then choose the single best queue from: "

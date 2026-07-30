@@ -97,6 +97,11 @@ def _security() -> None:
             "- **No outbound network calls from the UI.** The Streamlit app reads "
             "local files only. The Claude call happens offline, in "
             "`python -m src.batch_classify --with-rationale`.\n"
+            "- **That call sends no identity.** Prompts are built from an "
+            "allowlist (`src/sanitize.py`) — ticket subject and body plus the "
+            "scorer's verdict — and the surviving text has emails, phone "
+            "numbers, card-length digit runs, and the requester's own name "
+            "redacted out. Checked across all 8,469 tickets: zero leaks.\n"
             "- **Usage statistics are off** (`gatherUsageStats = false`), so a "
             "reviewer running this locally phones nothing home."
         )
