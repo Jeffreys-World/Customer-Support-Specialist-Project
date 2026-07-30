@@ -114,9 +114,15 @@ html { font-size: 112.5%; }
   display: none;
 }
 
-/* Main workspace: Zendesk runs edge-to-edge, Streamlit defaults to a wide gutter. */
+/* Main workspace: Zendesk runs edge-to-edge, Streamlit defaults to a wide gutter.
+   The horizontal value is the app's only left/right gutter — `.tc-appbar` and the
+   bordered panels all carry zero horizontal padding of their own, so every
+   heading and body line was landing on exactly the same x as the panel edge and
+   reading as text pressed against the wall. Widened by 1.05rem per side (18.9px
+   at this sheet's 18px root, i.e. half a centimetre) to give the type room to
+   breathe without narrowing the queue enough to cost a column. */
 [data-testid="stMainBlockContainer"] {
-  padding: 1.25rem 1.75rem 3rem;
+  padding: 1.25rem 2.8rem 3rem;
   max-width: 100%;
 }
 
