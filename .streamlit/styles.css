@@ -129,15 +129,39 @@ html { font-size: 112.5%; }
 }
 
 /* Main workspace: Zendesk runs edge-to-edge, Streamlit defaults to a wide gutter.
-   The horizontal value is the app's only left/right gutter — `.tc-appbar` and the
-   bordered panels all carry zero horizontal padding of their own, so every
-   heading and body line was landing on exactly the same x as the panel edge and
-   reading as text pressed against the wall. Widened by 1.05rem per side (18.9px
-   at this sheet's 18px root, i.e. half a centimetre) to give the type room to
-   breathe without narrowing the queue enough to cost a column. */
+   Two separate distances live here, and an earlier pass conflated them. Padding
+   on this container moves the WHITE SURFACE inward; it does not inset the text
+   within that surface. Widening it therefore bought breathing room for the type
+   by pushing the whole card away from the rail — the card floated in a 50px
+   moat while its own text still sat flush on its edge.
+
+   Split properly now: a thin outer gutter so the surface runs close to the rail
+   and the right edge the way an agent workspace should, and real padding on the
+   surface itself (below) so the type is evenly inset inside it. */
 [data-testid="stMainBlockContainer"] {
-  padding: 1.25rem 2.8rem 3rem;
+  padding: 1.25rem 0.9rem 3rem;
   max-width: 100%;
+}
+
+/* The page's white surface. Direct child only: nested `st.container(border=True)`
+   cards sit two levels deeper and would compound this padding three times over
+   if the selector were descendant-based. */
+[data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlockBorderWrapper"] {
+  padding-left: 1.6rem;
+  padding-right: 1.6rem;
+}
+
+/* Below ~600px the two paddings together would eat a third of the viewport, so
+   the inner inset relaxes and the outer gutter nearly closes. */
+@media (max-width: 600px) {
+  [data-testid="stMainBlockContainer"] {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+  [data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlockBorderWrapper"] {
+    padding-left: 0.9rem;
+    padding-right: 0.9rem;
+  }
 }
 
 /* --- The navigation rail -------------------------------------------------- */
