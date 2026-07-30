@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Wireframe — Jordan's Ticket Triage Assistant</title>
+<style>
+  /* Intentionally rough: no color, thin gray lines, system font only.
+     Purpose is to validate LAYOUT and HIERARCHY, not final visual polish
+     (that's a separate CSS/theming pass on top of Approach B). */
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    margin: 0; padding: 24px; background: #fff; color: #222;
+  }
+  .header {
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid #ccc; padding-bottom: 12px; margin-bottom: 16px;
+  }
+  .header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+  .chips { display: flex; gap: 8px; }
+  .chip {
+    border: 1px solid #ccc; border-radius: 6px; padding: 6px 10px;
+    font-size: 12px; min-width: 64px; text-align: center;
+  }
+  .chip .n { font-size: 16px; font-weight: 600; display: block; }
+  .layout { display: flex; gap: 20px; align-items: flex-start; }
+  .queue { flex: 3; }
+  .detail { flex: 2; border: 1px solid #ccc; border-radius: 8px; padding: 16px; }
+  .card {
+    border: 1px solid #ccc; border-radius: 8px; padding: 10px 12px;
+    margin-bottom: 8px; display: flex; align-items: center; gap: 10px;
+    font-size: 13px;
+  }
+  .card.selected { border: 1.5px dashed #666; background: #f7f7f7; }
+  .badge {
+    border: 1px solid #999; border-radius: 4px; padding: 2px 6px;
+    font-size: 11px; font-weight: 600; min-width: 60px; text-align: center;
+  }
+  .subject { flex: 1; }
+  .subject .sub { color: #777; font-size: 11px; }
+  .tag { border: 1px solid #ccc; border-radius: 10px; padding: 2px 8px; font-size: 11px; }
+  .sla { font-size: 11px; color: #555; min-width: 60px; text-align: right; }
+  .shield { font-size: 11px; border: 1px dashed #999; border-radius: 4px; padding: 1px 4px; }
+  .detail h2 { font-size: 14px; margin: 0 0 4px 0; }
+  .detail .score { color: #666; font-size: 12px; margin-bottom: 10px; }
+  .rationale { font-size: 12px; margin: 10px 0; padding-left: 16px; }
+  .stats { display: flex; gap: 12px; margin: 10px 0; }
+  .stat { border: 1px solid #ddd; border-radius: 6px; padding: 8px; flex: 1; font-size: 11px; }
+  .stat .v { font-size: 14px; font-weight: 600; }
+  .expander { border: 1px dashed #ccc; border-radius: 6px; padding: 8px; font-size: 11px; color: #666; margin-top: 8px; }
+  .actions { display: flex; gap: 8px; margin-top: 14px; border-top: 1px solid #eee; padding-top: 12px; }
+  .btn { border: 1px solid #333; border-radius: 6px; padding: 6px 12px; font-size: 12px; }
+  .btn.secondary { border: 1px solid #ccc; }
+  .select { border: 1px solid #ccc; border-radius: 6px; padding: 6px 8px; font-size: 12px; flex: 1; }
+  .note { font-size: 11px; color: #999; margin-top: 24px; }
+</style>
+</head>
+<body>
+
+  <!-- Slim header: product identity + priority-count chips, replaces the
+       plain st.title + 4-column st.metric row -->
+  <div class="header">
+    <h1>🎫 Jordan's Ticket Triage</h1>
+    <div class="chips">
+      <div class="chip">Critical<span class="n">3</span></div>
+      <div class="chip">High<span class="n">11</span></div>
+      <div class="chip">Medium<span class="n">27</span></div>
+      <div class="chip">Low<span class="n">14</span></div>
+    </div>
+  </div>
+
+  <div class="layout">
+    <!-- Queue: card rows replace st.dataframe. Each card is the click target
+         (real interactive state, not a table row) -->
+    <div class="queue">
+
+      <div class="card selected">
+        <div class="badge">CRITICAL</div>
+        <div class="subject">
+          Payment failed on renewal, account locked out
+          <div class="sub">Billing and Payments</div>
+        </div>
+        <div class="tag">Billing</div>
+        <div class="sla">⚠ breached</div>
+        <div class="shield">🛡</div>
+      </div>
+
+      <div class="card">
+        <div class="badge">HIGH</div>
+        <div class="subject">
+          Production API returning 500s for all users
+          <div class="sub">Technical Support</div>
+        </div>
+        <div class="tag">Technical</div>
+        <div class="sla">3.1h left</div>
+        <div class="shield">🛡</div>
+      </div>
+
+      <div class="card">
+        <div class="badge">MEDIUM</div>
+        <div class="subject">
+          How do I export my report to PDF?
+          <div class="sub">General Inquiry</div>
+        </div>
+        <div class="tag">General</div>
+        <div class="sla">18h left</div>
+        <div></div>
+      </div>
+
+      <div class="card">
+        <div class="badge">LOW</div>
+        <div class="subject">
+          Feature request: dark mode would be nice
+          <div class="sub">Product Support</div>
+        </div>
+        <div class="tag">Product</div>
+        <div class="sla">60h left</div>
+        <div></div>
+      </div>
+
+    </div>
+
+    <!-- Detail panel: same information as current render_detail(), tighter
+         hierarchy — score next to badge, rationale, two stat blocks,
+         collapsible body/ground-truth, action bar pinned at bottom -->
+    <div class="detail">
+      <h2>CRITICAL · Payment failed on renewal, account locked out</h2>
+      <div class="score">Score 92 / 100</div>
+
+      <div style="font-size:11px; border:1px dashed #999; border-radius:6px; padding:6px 8px;">
+        🛡 Critical-class safety net escalated this ticket to at least High.
+      </div>
+
+      <div style="font-size:12px; font-weight:600; margin-top:12px;">Why this priority</div>
+      <ul class="rationale">
+        <li>Contains hard-priority signal: "payment failed", "locked out"</li>
+        <li>Customer is fully blocked from account access</li>
+      </ul>
+
+      <div class="stats">
+        <div class="stat">Suggested queue<div class="v">Billing and Payments</div></div>
+        <div class="stat">Signals matched<div class="v">2</div></div>
+      </div>
+
+      <div class="expander">▸ Ticket body</div>
+      <div class="expander">▸ Ground-truth labels (reference)</div>
+
+      <div class="actions">
+        <button class="btn">✓ Confirm</button>
+        <select class="select"><option>Override category…</option></select>
+        <button class="btn secondary">Save override</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    Wireframe only — no color/type/spacing polish yet. Validates: card-based
+    queue with real selection state, slim chip header replacing 4-column
+    metric row, tightened detail-panel hierarchy (badge+score merged into one
+    line), action bar pinned to bottom instead of floating mid-panel.
+  </div>
+
+</body>
+</html>
