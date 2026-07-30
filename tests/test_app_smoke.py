@@ -286,6 +286,32 @@ def test_dashboard_integrity_panel_is_computed_from_the_batch():
     assert 0 < facts["csat"]["coverage"] < 1, "CSAT should cover only closed tickets"
 
 
+# Every module under src/ does `from src.… import …`, so running one as a file
+# path puts src/ on sys.path instead of the repo root and raises
+# ModuleNotFoundError. The README's own step 1, data_prep's docstring, the
+# missing-input error in batch_classify, and the app's empty-state error all told
+# the user to do exactly that. Anything instructing a user how to run this
+# pipeline must use `python -m src.<module>`.
+def test_docs_never_tell_you_to_run_a_src_module_as_a_file():
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    targets = [root / "README.md", root / "CASE_STUDY.md", root / "app.py"]
+    targets += sorted((root / "src").glob("*.py"))
+
+    offenders = [
+        f"{path.name}:{n}"
+        for path in targets
+        if path.exists()
+        for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
+        if re.search(r"python3?\s+src/\w+\.py", line)
+    ]
+    assert not offenders, (
+        "use `python -m src.<module>` instead — running a src/ module as a file "
+        f"path raises ModuleNotFoundError. Found at: {', '.join(offenders)}"
+    )
+
+
 # The `resolution` passthrough and the completeness flags. Both exist to replace a
 # tempting-but-empty "urgent response / overdue" flag pair with something measured,
 # so the tests pin the measurement rather than just the plumbing.

@@ -36,7 +36,7 @@ def _no_data_screen() -> None:
         "</div></div>"
     )
     st.error(
-        "Run `python src/data_prep.py` and then `python -m src.batch_classify` "
+        "Run `python -m src.data_prep` and then `python -m src.batch_classify` "
         "to generate `data/processed/classified_tickets.json`."
     )
     st.caption(

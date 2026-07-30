@@ -186,7 +186,7 @@ pip install -r requirements.txt
 
 # 1. Build the working set from the raw Kaggle CSV
 #    (place customer_support_tickets.csv in data/raw/ first)
-python src/data_prep.py
+python -m src.data_prep
 
 # 2. Classify the batch (score-only; no API key needed)
 python -m src.batch_classify

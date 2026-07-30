@@ -45,7 +45,7 @@ def load_tickets(path: Path) -> List[Ticket]:
     """Read ``data/processed/tickets.csv`` into Ticket objects."""
     if not path.exists():
         raise FileNotFoundError(
-            f"{path} not found. Run `python src/data_prep.py` first to build it."
+            f"{path} not found. Run `python -m src.data_prep` first to build it."
         )
     tickets: List[Ticket] = []
     with open(path, encoding="utf-8") as fh:

@@ -20,7 +20,14 @@ This script:
   7. carries the raw ``Resolution`` note through as ``resolution`` (see below),
   8. writes ``data/processed/tickets.csv`` with a stable ``id`` per ticket.
 
-Run:  ``python src/data_prep.py``  (add ``--input`` to point at a different CSV).
+Run:  ``python -m src.data_prep``  (add ``--input`` to point at a different CSV).
+
+Invoke it as a module, never by file path: running the file directly puts ``src/``
+on ``sys.path`` instead of the repo root, so the ``from src.schema import ...``
+below raises ``ModuleNotFoundError``. ``-m`` puts the working directory on the
+path, which is also how pytest is configured (``pythonpath = ["."]`` in
+pyproject.toml). ``test_docs_never_tell_you_to_run_a_src_module_as_a_file``
+enforces this across the docs.
 
 ## The placeholder substitution
 
