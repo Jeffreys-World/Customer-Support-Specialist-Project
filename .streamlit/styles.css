@@ -347,7 +347,11 @@ html { font-size: 112.5%; }
   min-width: 0;
 }
 .tc-appbar__title {
-  font-size: 1.05rem;
+  /* Page title. Was 1.05rem against a 0.95rem section heading — a ratio of
+     1.105, close enough that the two read as the same level and hierarchy was
+     carried by position alone. Now the top of a ~1.22 scale that runs
+     1.28 / 1.05 / 0.86rem (title / section / row text). */
+  font-size: 1.28rem;
   font-weight: 700;
   color: var(--tc-text);
   letter-spacing: -0.01em;
@@ -642,7 +646,8 @@ html { font-size: 112.5%; }
 
 /* Section heading used above lists and panels. */
 .tc-section {
-  font-size: 0.95rem;
+  /* Middle step of the title/section/row scale set on `.tc-appbar__title`. */
+  font-size: 1.05rem;
   font-weight: 700;
   color: var(--tc-text);
   margin: 0 0 0.55rem;
