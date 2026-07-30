@@ -294,6 +294,19 @@ html { font-size: 112.5%; }
   border-bottom: 1px solid var(--tc-border);
   margin-bottom: 1.1rem;
   font-family: var(--tc-font);
+  /* Single-row flex with no wrap let the count chip and avatar win every pixel
+     contest at narrow widths: at 375px the title block collapsed to ~40px and
+     the subtitle set one word per line ("Your / queue / arrived / pre- /
+     sorted."), while the avatar overflowed past the viewport edge. Wrapping
+     lets the chip and avatar drop to their own row instead. */
+  flex-wrap: wrap;
+  row-gap: 0.5rem;
+}
+/* The title + subtitle block. Targeted structurally because it is the only
+   unclassed div the component emits; `__spacer` is matched separately below. */
+.tc-appbar > div:first-of-type {
+  flex: 1 1 14rem;
+  min-width: 0;
 }
 .tc-appbar__title {
   font-size: 1.05rem;
