@@ -239,6 +239,14 @@ html { font-size: 112.5%; }
   font-size: 0.85rem;
   border-color: var(--tc-border-strong);
   transition: background 120ms ease, border-color 120ms ease;
+  /* A queue row puts the button in a narrow column. Without this, the label
+     breaks between characters and "Open" renders stacked as O / pe / n at
+     tablet width — the primary action on every row, mangled. Let the button
+     keep its label on one line and size to it instead. */
+  white-space: nowrap;
+}
+[data-testid="stButton"] button p {
+  white-space: nowrap;
 }
 [data-testid="stButton"] button:hover {
   border-color: var(--tc-primary);
