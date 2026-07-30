@@ -74,16 +74,46 @@ the most valuable thing in the repo. Anyone can produce a number. Knowing when a
 number is meaningless, proving it, and saying so in the product is the harder
 skill and the one that actually protects a business from acting on noise.
 
+## Testing my own claim
+
+"The labels are unlearnable" is a strong thing to assert from a chi-square, and the
+obvious objection is that a real machine-learning model might find signal a keyword
+scorer misses. So I tried to prove myself wrong: three models against the same label,
+each stronger than the last — two hand-picked features, then all 59 operational
+columns one-hot encoded, then TF-IDF over the ticket text itself.
+
+Held-out accuracy: 24.9%, 25.9%, 26.1%. Chance is 25.0% and always-guessing-the-
+biggest-class is 25.9%. The best model beats that by 0.2 points on 1,694 tickets,
+where one standard error is 1.1 points — so it is noise, and I report it as noise
+rather than as a win.
+
+The more useful number is the one beside it. Fit and score those models on the same
+rows, and the first reports **70.1%**. That is the figure a plan for this feature
+originally specified, and it is pure memorisation: a 45-point gap to its real
+performance. There is no predicted-priority column in the console, because at 25%
+it would be a random number sitting next to a real one.
+
+Two smaller findings came out of the same profiling pass. The `Resolution` column
+looked like a gift — 2,769 free-text closing notes going unused — until I read them:
+*"Case maybe show recently my computer follow."* All unique, 4% containing any
+support word, none naming the product they supposedly fixed. And the three
+data-quality flags I had planned turned out to be the `status` column wearing a
+different hat: every blank field's blanks are perfectly predicted by status, and
+there is no ticket-creation timestamp anywhere, so "open more than 5 days" was true
+for all 8,469 rows. I shipped the measurement instead of the flags.
+
 ## What I'd do differently / next
 
 - **Validate against a dataset whose labels correlate with its text.** That is the
   only way to get a meaningful accuracy figure, and it beats tuning keywords
   against noise.
 - Profile label quality *before* building on a dataset, not after. Ten minutes of
-  chi-square would have reframed the swap up front.
-- Add a small trained classifier (TF-IDF + logistic regression) as a comparison
-  baseline — on data where learning is possible, it would establish the ceiling
-  the rule-based scorer is measured against.
+  chi-square would have reframed the swap up front. The same goes for individual
+  columns: I planned three features around `Resolution` and a days-open clock before
+  checking that one was filler and the other did not exist.
+- The TF-IDF classifier is now built, but as a ceiling test rather than a baseline.
+  On data where learning *is* possible, the same file becomes the comparison the
+  rule-based scorer is measured against — that is the interesting version of it.
 - Deploy the dashboard so a hiring manager can click through it, not just read
   about it.
 
@@ -91,3 +121,4 @@ skill and the one that actually protects a business from acting on noise.
 
 - Code, architecture, and full results: [`README.md`](README.md)
 - Measured evaluation: [`results/evaluation.md`](results/evaluation.md)
+- The ML ceiling experiment: [`results/priority_prediction.md`](results/priority_prediction.md)
