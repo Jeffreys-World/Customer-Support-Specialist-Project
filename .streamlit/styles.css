@@ -40,10 +40,22 @@
   --tc-text: #2F3941;
   --tc-muted: #68737D;
 
-  --tc-critical: #CC3340;
-  --tc-high: #ED8F1C;
-  --tc-medium: #EFC02D;
-  --tc-low: #2E8B57;
+  /* Priority accents, as used by PAGE MARKUP. `ui.theme.Color` keeps the
+     original brighter hex for Altair, and that split is why these can be tuned
+     for type without touching a single chart: charts read the literal hex,
+     markup reads these vars (see PriorityToken's docstring).
+
+     Measured on white with the WCAG formula, the brighter values failed as text
+     — High 2.46:1 and Medium 1.71:1 against the 3:1 floor for large type, and
+     Medium is the single worst contrast in the console. Darkened along the same
+     hue until each clears 4.5:1, so they stay legible at any size rather than
+     only as 25px KPI numerals. Low was already 4.25:1: it passed at KPI size but
+     would have failed the moment it was used at body size, so it is pulled over
+     the line preventively. Critical was already 5.10:1 and is unchanged. */
+  --tc-critical: #CC3340;  /* 5.10:1 */
+  --tc-high: #AD650E;      /* was #ED8F1C, 2.46:1 -> 4.52:1 */
+  --tc-medium: #93720B;    /* was #EFC02D, 1.71:1 -> 4.51:1 */
+  --tc-low: #2D8654;       /* was #2E8B57, 4.25:1 -> 4.52:1 */
 
   /* Soft pill/chip backgrounds per priority. These are the values that have to
      change for dark mode — the accents above stay put, because a red that means
