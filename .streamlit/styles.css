@@ -52,7 +52,7 @@
      only as 25px KPI numerals. Low was already 4.25:1: it passed at KPI size but
      would have failed the moment it was used at body size, so it is pulled over
      the line preventively. Critical was already 5.10:1 and is unchanged. */
-  --tc-critical: #CC3340;  /* 5.10:1 */
+  --tc-critical: #CB3340;  /* 5.13:1 on white; 4.52:1 on its own tint */
   --tc-high: #AD650E;      /* was #ED8F1C, 2.46:1 -> 4.52:1 */
   --tc-medium: #93720B;    /* was #EFC02D, 1.71:1 -> 4.51:1 */
   --tc-low: #2D8654;       /* was #2E8B57, 4.25:1 -> 4.52:1 */
@@ -67,10 +67,12 @@
 
   /* Status pill, demo badge, and the amber internal note. Previously hardcoded
      at each use site, which meant dark mode could not reach them. */
+  /* Pill text is 13px, so it needs the full 4.5:1 against its own tint — not the
+     3:1 large-text allowance the KPI numerals get. Both were measured short. */
   --tc-open-tint: #EDF7ED;
-  --tc-open-text: #2E8B57;
+  --tc-open-text: #2A7F50;   /* was #2E8B57, 3.87:1 -> 4.50:1 on the tint */
   --tc-demo-tint: #F1F1F4;
-  --tc-demo-text: #68737D;
+  --tc-demo-text: #656F79;   /* was #68737D, 4.30:1 -> 4.54:1 on the tint */
   --tc-note-bg: #FFF7E8;
   --tc-note-border: #F5D9A8;
   --tc-note-head: #AD5F00;
