@@ -182,7 +182,11 @@ def render_safety_net() -> None:
     """
     def _list(tickets: List[Dict]) -> None:
         escalated = [t for t in tickets if t.get("safety_net_triggered")]
-        with st.expander("How priority is decided, and what the safety net does", expanded=False):
+        # "How priority is decided, and what the safety net does" was two noun
+        # clauses spliced with a comma, doing a heading's job in 47 characters.
+        # This says the same thing in four words, in active voice, and names the
+        # question an agent actually arrives with: why is this ticket here?
+        with st.expander("How a ticket gets escalated", expanded=False):
             c.scorer_explainer(
                 domain.scorer_reference(),
                 domain.safety_net_stats(),

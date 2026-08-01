@@ -113,18 +113,28 @@ def _security() -> None:
 
 
 def _notifications() -> None:
+    """Notifications, stated rather than switched.
+
+    This panel used to render three toggles that were `disabled=True` forever,
+    under a caption explaining they would never do anything. Three controls whose
+    entire purpose was to announce their own uselessness.
+
+    Cut in favour of the sentence. A control that cannot be operated has not
+    earned its pixels, and the Security panel below already does exactly this:
+    it states how the build behaves instead of offering switches that do not
+    switch. This also removes three controls from the keyboard-focus contract,
+    which is the cheapest possible way to finish that work.
+    """
     with st.container(border=True):
         c.panel_title("Notifications")
-        st.toggle("Email me when a Critical ticket arrives", value=True,
-                  key="settings_notify_critical", disabled=True)
-        st.toggle("Email me when a ticket breaches SLA", value=True,
-                  key="settings_notify_sla", disabled=True)
-        st.toggle("Daily queue digest", value=False,
-                  key="settings_notify_digest", disabled=True)
+        st.markdown(
+            "**There are none, and that is deliberate.** This project triages "
+            "tickets. It has no outbound mail path, no scheduler, and no address "
+            "to send to, so there is nothing to configure here."
+        )
         st.caption(
-            "Disabled, deliberately. This project triages tickets; it has no "
-            "outbound mail path, no scheduler, and no address to send to. "
-            "Enabling these would persist a preference nothing ever reads."
+            "A Critical ticket surfaces at the top of Home and in Safety-net "
+            "escalations. That is the whole notification system."
         )
 
 
