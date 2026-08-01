@@ -62,3 +62,74 @@ scope beyond the day-or-two UI polish budget.
 this is a regression-prevention check on the finished visual system, not something to
 build alongside it. In the meantime, a manual `/design-review` pass after any future
 Streamlit version upgrade is the interim mitigation.
+
+**Status update (2026-08-01, `/plan-ceo-review`):** being addressed, but not as a pixel
+diff. A committed PNG baseline was rejected on the same grounds `ui/components.py:574-580`
+rejected the KPI emoji — this repo is worked from Windows and macOS, font rasterization
+differs between them, and there is no CI to pin a single generator. The version now in
+scope asserts computed styles and element presence instead: that `.st-key-*` scoping
+resolved, that `.tc-kpi__value` is not Streamlit's default colour, that the rail width
+tracks the font-scale token, and that dark mode declares `color-scheme: dark`. Screenshots
+are still written for human review; they are just not the pass/fail signal. That catches
+the silent degradation this entry was written about without inheriting a cross-machine
+trap. Close this entry once those assertions land.
+
+## URL-mirrored view state for attention limit and default sort
+
+**What:** Mirror `pref_attention_limit` and `pref_default_sort` into the query string the
+way `ui/theme.py:162-172` already mirrors dark mode, so a pasted link reproduces the exact
+view.
+
+**Why:** Surfaced by `/plan-ceo-review` on 2026-08-01 as expansion E4 while building the
+preferences substrate. Once all four preferences sit on one persistence layer, adding the
+URL mirror to the remaining two is close to free.
+
+**Pros:** A README or portfolio link could open the console at a chosen list length and
+sort, not just a chosen theme.
+
+**Cons:** It reverses a decision the code already argues for in `ui/views/settings.py:160-165`:
+*"these are not [mirrored], since a shared link carrying someone else's list length would be
+surprising rather than useful."* That reasoning still holds. "The substrate makes it cheap"
+is not a good enough reason to overturn it.
+
+**Context:** Deferred deliberately, not overlooked. Font size ships mirrored as part of the
+same substrate work, because a text-size preference that resets on refresh is an
+accessibility defect rather than a preference — that is the same argument that made dark
+mode mirrored. The other two are ordinary view state and stay session-scoped. Revisit only
+if the console starts publishing shareable deep links.
+
+**Effort estimate:** S (human) → S (with CC). **Priority:** P3.
+
+**Depends on / blocked by:** `ui/prefs.py` lands first (it is the substrate this would
+build on).
+
+## Split .streamlit/styles.css into three files
+
+**What:** Break the 1034-line stylesheet into `tokens.css` (custom properties),
+`streamlit-shell.css` (the `data-testid` overrides), and `components.css` (our own `tc-*`
+classes).
+
+**Why:** Surfaced by `/plan-ceo-review` on 2026-08-01. Nineteen commits touched this one
+file in the preceding 30 days. It holds three concerns with completely different risk
+profiles: the tokens essentially never break, while the block at line 116 is self-labelled
+*"the upgrade-sensitive block"* and is the only part a Streamlit version bump can break.
+Burying the fragile third in the same file as the stable two makes it impossible to review
+the risky changes on their own.
+
+**Pros:** A Streamlit upgrade becomes a diff against one file instead of a scan of 1034
+lines. Token changes stop touching the same file as shell hacks.
+
+**Cons:** Three `read_text` calls instead of one in `inject_css` (mitigated once that
+function is cached). A split has no behavioural signature, so it is invisible in review
+and easy to get subtly wrong.
+
+**Context:** The UI clarity plan (2026-08-01) adds a type-scale layer and a rail-width
+token to this file, which is what pushed it over the line. Do the split *after* that plan
+lands, and specifically after the computed-style assertions from the visual-regression
+entry above are in place — splitting a stylesheet with nothing asserting how it renders is
+the change most likely to break styling silently.
+
+**Effort estimate:** M (human) → S (with CC). **Priority:** P2.
+
+**Depends on / blocked by:** The UI clarity plan ships first; the computed-style assertions
+ship before the split.
