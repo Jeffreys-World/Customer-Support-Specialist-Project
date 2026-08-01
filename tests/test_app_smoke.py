@@ -916,3 +916,91 @@ def test_safety_net_rail_drops_a_count_that_is_always_the_whole_page():
         "on a mixed queue the safety-net count is real information about how "
         "much of it the scorer overrode"
     )
+
+
+# Regression: the keyboard contract. Before this, styles.css had exactly ONE
+# focus rule, scoped to [data-testid="stMainBlockContainer"] ... button, which
+# measured (in the browser) as a visible focus ring on 1 of 6 distinct control
+# kinds. Nav links, the profile popover, and the slider had none. Same scoping
+# mistake as ISSUE-001: a rule written against one DOM path instead of against
+# control classes. Found by /qa on 2026-08-01.
+# Report: .gstack/qa-reports/qa-report-localhost-2026-08-01.md
+def _css():
+    from pathlib import Path
+
+    return (Path(__file__).resolve().parents[1] / ".streamlit" / "styles.css").read_text(
+        encoding="utf-8"
+    )
+
+
+def _ratio(hex_a: str, hex_b: str) -> float:
+    def lum(h):
+        h = h.lstrip("#")
+        out = []
+        for i in (0, 2, 4):
+            v = int(h[i:i + 2], 16) / 255
+            out.append(v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4)
+        return 0.2126 * out[0] + 0.7152 * out[1] + 0.0722 * out[2]
+
+    a, b = lum(hex_a), lum(hex_b)
+    return (max(a, b) + 0.05) / (min(a, b) + 0.05)
+
+
+def test_focus_ring_reaches_every_control_class():
+    css = _css()
+    # Each of these was measured as having NO focus style before the contract.
+    for needed in (
+        "stSidebarNavLink",      # the 7 rail links
+        "stPopover",             # the account menu trigger
+        "stSlider",              # the Home-list size control
+        "stSelectbox",
+        "stMultiSelect",
+        "stTextInput",
+        "stTextArea",
+        "stExpander",
+    ):
+        assert re.search(rf"{needed}[^{{]*:focus(-visible|-within)", css), (
+            f"{needed} has no focus rule — a keyboard user cannot see it"
+        )
+
+
+def test_focus_ring_clears_the_wcag_floor_on_both_surfaces():
+    """WCAG 2.2 SC 1.4.11: focus indicators need 3:1 against their background.
+
+    The rail is why this exists. --tc-primary (#1F73B7) on #03363D measures
+    2.62:1, so a single ring token cannot serve both surfaces.
+    """
+    css = _css()
+    rail_ring = re.search(r"--tc-focus-ring-rail:\s*(#[0-9A-Fa-f]{6})", css)
+    assert rail_ring, "the rail needs its own focus-ring token"
+
+    rail_bg = re.search(r"--tc-rail:\s*(#[0-9A-Fa-f]{6})", css)
+    assert rail_bg, "--tc-rail missing"
+
+    ratio = _ratio(rail_ring.group(1), rail_bg.group(1))
+    assert ratio >= 3.0, (
+        f"focus ring {rail_ring.group(1)} on rail {rail_bg.group(1)} is "
+        f"{ratio:.2f}:1, below the 3:1 floor"
+    )
+    # The old single-token value is the exact thing this guards against.
+    assert _ratio("#1F73B7", rail_bg.group(1)) < 3.0, (
+        "sanity check: --tc-primary was supposed to be the failing value"
+    )
+
+
+def test_notifications_panel_has_no_dead_toggles():
+    """Three toggles shipped disabled=True forever, explaining their own uselessness.
+
+    A control that cannot be operated has not earned its pixels.
+    """
+    at = AppTest.from_string(
+        "from ui.views import settings\nsettings.render()\n", default_timeout=120
+    ).run()
+    assert not at.exception, at.exception
+    labels = [t.label for t in at.get("toggle")]
+    for dead in ("Email me when a Critical ticket arrives",
+                 "Email me when a ticket breaches SLA",
+                 "Daily queue digest"):
+        assert dead not in labels, f"{dead!r} is a control that does nothing"
+    # Dark mode is a real preference and must survive the cut.
+    assert "Dark mode" in labels, "the one working toggle must remain"

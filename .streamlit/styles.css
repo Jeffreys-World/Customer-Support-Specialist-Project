@@ -1027,11 +1027,95 @@ html { font-size: 112.5%; }
   transform: translateX(2px);
 }
 
-/* Keyboard parity. Everything above is hover-only, which leaves keyboard users
-   with no equivalent feedback — so give focus the same treatment, visibly. */
-[data-testid="stMainBlockContainer"] [data-testid="stButton"] button:focus-visible {
-  outline: 2px solid var(--tc-primary);
-  outline-offset: 2px;
+/* ============================================================================
+   INTERACTION STATES — the keyboard contract
+   ----------------------------------------------------------------------------
+   This block used to be one rule: workspace buttons only. Measured in the
+   browser, that gave a visible focus ring to 1 of 6 distinct control kinds. The
+   navigation links, the profile popover, and the slider had none at all — a
+   keyboard user could tab the whole console and never see where they were.
+
+   Two things went wrong, and both are fixed here rather than patched.
+
+   1. SCOPE. The old rule was `[data-testid="stMainBlockContainer"] ... button`,
+      so it could only ever match buttons inside the workspace. Everything in the
+      rail, everything Streamlit portals to the document root, and every widget
+      that is not a <button> fell outside it. This is the same scoping mistake
+      that made the dark-mode account menu render white-on-white (ISSUE-001):
+      a rule written against ONE DOM PATH instead of against control classes.
+      So the selectors below name control classes and are deliberately not
+      nested under a container.
+
+   2. CONTRAST. The ring colour was `--tc-primary` (#1F73B7) everywhere. On the
+      workspace that measures 5.01:1 against white and 4.88:1 against a dark card
+      — fine. On the navigation rail (#03363D) it measures 2.62:1, under the 3:1
+      floor WCAG 2.2 SC 1.4.11 sets for focus indicators. The rail carries seven
+      links, so the failure was on the most-used controls in the app.
+
+      Hence two tokens. The rail ring is a lightened Garden blue rather than
+      plain white: it clears the floor at 7.60:1 while still reading as this
+      product's accent instead of a browser default.
+
+   Ratios are asserted in tests/test_app_smoke.py, so a future palette change
+   that breaks the floor fails the suite instead of shipping quietly.
+   ========================================================================== */
+
+:root {
+  --tc-focus-ring: var(--tc-primary);   /* workspace: 5.01:1 on white */
+  --tc-focus-ring-rail: #8ECDF0;        /* rail: 7.60:1 on #03363D */
+  --tc-focus-width: 2px;
+  --tc-focus-offset: 2px;
+}
+
+/* Workspace controls. Named by class, not by container, so a widget that moves
+   in a Streamlit upgrade keeps its ring. */
+[data-testid="stButton"] button:focus-visible,
+[data-testid="stBaseButton-secondary"]:focus-visible,
+[data-testid="stBaseButton-primary"]:focus-visible,
+[data-testid="stPopover"] button:focus-visible,
+[data-testid="stPopoverBody"] button:focus-visible,
+[data-testid="stExpander"] summary:focus-visible,
+[data-testid="stSlider"] [role="slider"]:focus-visible,
+[data-testid="stTextInput"] input:focus-visible,
+[data-testid="stTextArea"] textarea:focus-visible,
+[data-testid="stSelectbox"] div[data-baseweb="select"]:focus-within,
+[data-testid="stMultiSelect"] div[data-baseweb="select"]:focus-within,
+[data-testid="stCheckbox"] input:focus-visible + div,
+[role="switch"]:focus-visible,
+[data-testid="stMain"] a:focus-visible {
+  outline: var(--tc-focus-width) solid var(--tc-focus-ring);
+  outline-offset: var(--tc-focus-offset);
+  border-radius: var(--tc-radius-sm);
+}
+
+/* The rail. Its own ring, because --tc-primary fails the 3:1 floor on teal. */
+[data-testid="stSidebar"] [data-testid="stSidebarNavLink"]:focus-visible,
+[data-testid="stSidebar"] a:focus-visible,
+[data-testid="stSidebar"] button:focus-visible,
+[data-testid="stSidebar"] [role="switch"]:focus-visible,
+[data-testid="stSidebarCollapseButton"] button:focus-visible,
+[data-testid="stSidebarCollapsedControl"] button:focus-visible {
+  outline: var(--tc-focus-width) solid var(--tc-focus-ring-rail);
+  outline-offset: var(--tc-focus-offset);
+  border-radius: var(--tc-radius-sm);
+}
+
+/* Pressed. Hover says "this is live", focus says "you are here", active says
+   "it registered" — the third was missing entirely, so a click on a slow rerun
+   gave no acknowledgement at all. */
+[data-testid="stButton"] button:active,
+[data-testid="stSidebar"] [data-testid="stSidebarNavLink"]:active {
+  transform: translateY(1px);
+}
+
+/* Disabled. Streamlit dims its own disabled controls, but nothing said they are
+   not merely low-contrast text, so the cursor kept saying "clickable". */
+[data-testid="stButton"] button:disabled,
+[data-testid="stMain"] input:disabled,
+[data-testid="stMain"] textarea:disabled,
+[role="switch"][aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 /* Respect the OS setting. Motion here is decoration, never the only channel
