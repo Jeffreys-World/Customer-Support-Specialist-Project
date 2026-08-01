@@ -769,3 +769,53 @@ def test_ticket_detail_renders_with_a_ticket_open():
     assert "tc-note" in body
     # Simulated panels must always be labelled (D1).
     assert "tc-pill--demo" in body
+
+
+# Regression: ISSUE-003 — both queue pages route through `_open_detail_or` and
+# share the open-tab state, so opening a ticket on Tickets and then clicking
+# "Safety-net escalations" rendered that same ticket's detail under the
+# escalation heading. Observed live with a ticket whose own Safety net field read
+# "Not triggered": the page carrying this project's headline correctness claim
+# was displaying a ticket the net never touched.
+# Found by /qa on 2026-08-01.
+# Report: .gstack/qa-reports/qa-report-localhost-2026-08-01.md
+def test_safety_net_page_does_not_open_a_ticket_the_net_never_touched():
+    script = (
+        "from ui.views import tickets\n"
+        "from ui import state, domain\n"
+        "ts = [t for t in domain.load_tickets() if not t.get('safety_net_triggered')]\n"
+        "if ts:\n"
+        "    state.open_ticket(ts[0]['id'])\n"
+        "tickets.render_safety_net()\n"
+    )
+    at = AppTest.from_string(script, default_timeout=120).run()
+    assert not at.exception, at.exception
+
+    body = _html(at)
+    assert "Safety-net escalations" in body, (
+        "a non-escalated ticket must fall through to this page's own queue, "
+        "not hijack it"
+    )
+    assert "tc-explain__net" in body, "the page's own explainer must still render"
+
+
+# The other half of ISSUE-003: the fix must not over-correct into "this page
+# never opens anything". Opening an escalated ticket from the escalation queue is
+# the intended behaviour — a ticket opens inside its view rather than as its own
+# navigation entry, which is the whole premise of the tab strip.
+def test_safety_net_page_still_opens_an_escalated_ticket():
+    script = (
+        "from ui.views import tickets\n"
+        "from ui import state, domain\n"
+        "ts = [t for t in domain.load_tickets() if t.get('safety_net_triggered')]\n"
+        "if ts:\n"
+        "    state.open_ticket(ts[0]['id'])\n"
+        "tickets.render_safety_net()\n"
+    )
+    at = AppTest.from_string(script, default_timeout=120).run()
+    assert not at.exception, at.exception
+
+    body = _html(at)
+    assert "tc-note" in body, (
+        "an escalated ticket must still open inline on the escalation page"
+    )

@@ -123,11 +123,24 @@ def _statistics_rail(tickets: List[Dict]) -> None:
 
 # --- Navigation entry points --------------------------------------------------
 
-def _open_detail_or(render_list) -> None:
-    """Show the detail view when a ticket is open, otherwise the list."""
+def _open_detail_or(render_list, belongs_here=None) -> None:
+    """Show the detail view when a ticket is open, otherwise the list.
+
+    ``belongs_here`` decides whether *this* destination is willing to open a
+    given ticket inline. Both queue pages share the open-tab state, so without
+    it, opening a ticket on Tickets and then clicking "Safety-net escalations"
+    left the agent looking at that same ticket under the escalation heading —
+    including tickets whose own Safety net field read "Not triggered". The page
+    carrying this project's headline correctness claim was showing a ticket the
+    net never touched, and the rail gave no clue you had arrived somewhere.
+    Found by /qa (ISSUE-003).
+
+    Passing None means "this page will open anything", which is right for
+    Tickets: it is the full queue, so every ticket genuinely belongs to it.
+    """
     tickets = domain.load_tickets()
     active = state.find_ticket(tickets, state.active_ticket_id())
-    if active is not None:
+    if active is not None and (belongs_here is None or belongs_here(active)):
         ticket_detail.render(active, tickets)
     else:
         render_list(tickets)
@@ -176,4 +189,6 @@ def render_safety_net() -> None:
             empty_message="No safety-net escalations in this batch.",
         )
 
-    _open_detail_or(_list)
+    # Only escalated tickets open inline here. Anything else opened elsewhere
+    # falls through to this page's own list rather than hijacking it.
+    _open_detail_or(_list, belongs_here=lambda t: bool(t.get("safety_net_triggered")))
