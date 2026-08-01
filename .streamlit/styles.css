@@ -185,6 +185,25 @@ html { font-size: 112.5%; }
   max-width: 100%;
 }
 
+/* Collapsed rail: reserve room for the floating brand mark.
+   When the rail collapses, Streamlit floats a control carrying the logo and the
+   expand arrow at the top-left of the workspace. It is `position: fixed` with a
+   z-index of 999990, so it is not in flow and nothing below it moves out of the
+   way. Measured at 1440x900: the control occupies y 22-67 while the workspace
+   starts at y 0 with only 22.5px of padding, which put the open-ticket tab strip
+   at y 40 — directly underneath. The logo covered the left 17x22px of the first
+   tab, including its priority dot, and swallowed clicks meant for it.
+
+   `:has()` is what makes this conditional: the collapsed control only exists in
+   the DOM while the rail is collapsed, so the extra padding appears exactly then
+   and the expanded layout is untouched. 3.25rem puts the tab strip at y 76,
+   clear of the control's 67px foot.
+
+   Found by /qa (ISSUE-004). */
+.stApp:has([data-testid="stSidebarCollapsedControl"]) [data-testid="stMainBlockContainer"] {
+  padding-top: 3.25rem;
+}
+
 /* The page's white surface. Direct child only: nested `st.container(border=True)`
    cards sit two levels deeper and would compound this padding three times over
    if the selector were descendant-based. */

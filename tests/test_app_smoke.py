@@ -819,3 +819,60 @@ def test_safety_net_page_still_opens_an_escalated_ticket():
     assert "tc-note" in body, (
         "an escalated ticket must still open inline on the escalation page"
     )
+
+
+# Regression: ISSUE-004 — when the rail collapses, Streamlit floats a control
+# carrying the logo and the expand arrow at the top-left of the workspace. It is
+# `position: fixed`, so nothing below it moves out of the way. Measured at
+# 1440x900: the control sat at y 22-67 while the open-ticket tab strip sat at
+# y 40, and the logo covered the left 17x22px of the first tab including its
+# priority dot. Found by /qa on 2026-08-01.
+# Report: .gstack/qa-reports/qa-report-localhost-2026-08-01.md
+def test_collapsed_rail_reserves_room_for_the_floating_logo():
+    from pathlib import Path
+
+    css = (Path(__file__).resolve().parents[1] / ".streamlit" / "styles.css").read_text(
+        encoding="utf-8"
+    )
+    rule = re.search(
+        r"\.stApp:has\(\[data-testid=\"stSidebarCollapsedControl\"\]\)\s*"
+        r"\[data-testid=\"stMainBlockContainer\"\]\s*\{([^}]*)\}",
+        css,
+    )
+    assert rule, (
+        "the collapsed-rail padding rule is missing — without it the floating "
+        "logo overlaps the open-ticket tab strip"
+    )
+    pad = re.search(r"padding-top:\s*([\d.]+)rem", rule.group(1))
+    assert pad, "the rule must set padding-top"
+    # The control's foot measured 67px; at a 112.5% root (18px) the tab strip
+    # clears it from 3rem upward. Below that the overlap returns silently.
+    assert float(pad.group(1)) >= 3.0, (
+        f"padding-top {pad.group(1)}rem is too small to clear the 67px control"
+    )
+
+
+# Regression: ISSUE-001 — a popover's body is portaled out of the component tree
+# when it opens, landing outside both stMain and stSidebar. The dark sheet's
+# button rule is scoped to stMain, so the account menu kept the light theme's
+# white button fill while its labels resolved through --tc-text (near-white in
+# dark mode). Measured 1.22:1 against a 4.5:1 floor — the labels were invisible.
+# Found by /qa on 2026-08-01.
+# Report: .gstack/qa-reports/qa-report-localhost-2026-08-01.md
+def test_dark_theme_reaches_inside_portaled_popovers():
+    from pathlib import Path
+
+    css = (Path(__file__).resolve().parents[1] / ".streamlit" / "styles-dark.css").read_text(
+        encoding="utf-8"
+    )
+    rule = re.search(
+        r"\[data-testid=\"stPopoverBody\"\]\s*\[data-testid=\"stButton\"\]\s*button\s*\{([^}]*)\}",
+        css,
+    )
+    assert rule, (
+        "dark mode must theme buttons INSIDE the popover body, not just the body "
+        "itself — the stMain-scoped rule cannot reach a portaled popover"
+    )
+    body = rule.group(1)
+    assert "var(--tc-surface)" in body, "the button fill must follow the theme token"
+    assert "var(--tc-text)" in body, "the button label must follow the theme token"
