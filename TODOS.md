@@ -133,3 +133,33 @@ the change most likely to break styling silently.
 
 **Depends on / blocked by:** The UI clarity plan ships first; the computed-style assertions
 ship before the split.
+
+## Dashboard: a stacked chart is rendering from an empty dataset
+
+**What:** Vega logs `Infinite extent for field "Tickets_end": [Infinity, -Infinity]`
+(and `Tickets_start`, `Tickets`) on every Dashboard load. Identify which stacked
+chart is receiving zero rows and either stop rendering it or say why it is empty.
+
+**Why:** Surfaced by `/qa` on 2026-08-01 during the post-fix verification sweep.
+`[Infinity, -Infinity]` is Vega's empty-domain sentinel: it computes a range from
+no data. `_start`/`_end` are the fields Vega generates for a *stacked* bar, which
+narrows it to the stacked charts on the Dashboard.
+
+**Pros:** Either a chart disappears that was never showing anything, or a filter
+bug surfaces that is currently silent. Both are better than the present state,
+where the page looks fine and the console disagrees.
+
+**Cons:** Warning-level only. Nothing visibly breaks, and no user has complained —
+this is the console telling on the app rather than a reported symptom.
+
+**Context:** Not caused by the 2026-08-01 QA fixes, which touched `styles.css`,
+`styles-dark.css`, and `ui/views/tickets.py` — no chart code. Start at
+`ui/views/dashboard.py` and look for a chart whose `_has_data` guard passes but
+whose grouped frame is empty; the dataset has known column-completeness gaps
+(see the Data integrity panel), so an empty group is plausible rather than
+surprising. Full detail in `.gstack/qa-reports/qa-report-localhost-2026-08-01.md`
+under ISSUE-008.
+
+**Effort estimate:** S (human) → S (with CC). **Priority:** P3.
+
+**Depends on / blocked by:** Nothing.
