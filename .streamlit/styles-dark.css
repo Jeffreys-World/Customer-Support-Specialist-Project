@@ -115,6 +115,32 @@ div[data-baseweb="popover"] ul,
   color: var(--tc-text);
 }
 
+/* ...and so does everything INSIDE that portal, which the rule above does not
+   reach. Theming the popover's own background is not enough: Streamlit paints the
+   wrapper it nests inside, and every button within it, using the LIGHT theme's
+   white fill — `secondaryBackgroundColor` from `config.toml`, which Streamlit 1.39
+   reads once at server start and this sheet cannot change. The label text, meanwhile,
+   resolves through `--tc-text`, which this file redefines to #E4E9ED.
+   Dark mode therefore rendered #E4E9ED on #FFFFFF: a contrast ratio of 1.22:1
+   against a 4.5:1 floor, which made all four account controls invisible.
+
+   The `stMain` block below does the same job for the workspace. It cannot be widened
+   to cover this, because when the popover is open its body is portaled out of both
+   stMain and the sidebar — it is a sibling of the app root, reachable only by its
+   own testid. Found by /qa (ISSUE-001). */
+[data-testid="stPopoverBody"] > div {
+  background: var(--tc-surface);
+}
+[data-testid="stPopoverBody"] [data-testid="stButton"] button {
+  background: var(--tc-surface);
+  color: var(--tc-text);
+  border-color: var(--tc-border-strong);
+}
+[data-testid="stPopoverBody"] [data-testid="stButton"] button:hover {
+  border-color: var(--tc-primary);
+  color: var(--tc-primary);
+}
+
 [data-testid="stMain"] [data-testid="stButton"] button {
   background: var(--tc-surface);
   color: var(--tc-text);
