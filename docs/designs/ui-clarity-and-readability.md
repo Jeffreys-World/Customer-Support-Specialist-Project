@@ -149,6 +149,82 @@ Items 6 and 9 arrived as separate requests and resolve into one move. Item 6 rem
 
 **Item 4 is unresolved statically.** `stChatMessage` has `background: transparent` and no border, so it is not the box described. The two candidates are the composer card at `ui/views/ticket_detail.py:178-184` and the `.tc-note` block at `.streamlit/styles.css:650-657`. Resolve by rendering the ticket detail view and looking, before writing any CSS.
 
+## Round 2 — interaction states, 2026-08-01 (HOLD SCOPE)
+
+A second review after `/qa` fixed four bugs. Four new asks: a clickable info icon for
+the explainer, fix its wording, improve every menu and toggle, and reach a 100% health
+score.
+
+### The measurement that reframed it
+
+| Interaction state | Rules in `styles.css` | Controls needing them |
+|---|---|---|
+| hover | 13 | 33 |
+| **focus** | **1** | **33** |
+| active | 0 | 33 |
+| disabled | 0 | 3 ship `disabled=True` |
+
+The single focus rule is `styles.css:1032`, scoped to
+`[data-testid="stMainBlockContainer"] [data-testid="stButton"] button`. It covers buttons
+in the workspace and nothing else: not the 7 nav links, not the popover, not a single
+toggle, slider, select, multiselect, input, or expander. A keyboard user sees a focus
+ring on roughly 1 of 33 control types.
+
+**This is ISSUE-001's bug in a different property.** That was a dark-mode rule scoped to
+`stMain` that missed a portaled popover. This is a focus rule scoped to
+`stMainBlockContainer` that misses everything outside it. Colour got fixed; focus was
+never written. The scoping trap is systemic, which is why the contract below is written
+against control *classes* rather than DOM paths.
+
+### On the 100% health score
+
+Raised once, then executed as asked. The score is a rubric applied to defects one
+reviewer chose to look for, so optimising it directly optimises a proxy. Concretely: the
+96 reported after `/qa` was overstated, because Accessibility was scored 100 without ever
+auditing focus states. Scored honestly against the table above, Accessibility is 85 and
+the overall is ~94. The first honest step toward 100 lowers the number.
+
+The target adopted instead, which reaches 100 on the same work but survives new
+discovery: **zero known open defects, and WCAG 2.2 AA on every interactive control** —
+an external spec with pass/fail criteria, asserted in the suite rather than asserted by
+a reviewer.
+
+### Decisions
+
+| # | Finding | Decision | Reasoning |
+|---|---------|----------|-----------|
+| 1 | `--tc-primary` (#1F73B7) on the rail (#03363D) measures **2.62:1**, below WCAG 2.2 SC 1.4.11's 3:1 floor for focus indicators | **1A** — two tokens, `--tc-focus-ring` and `--tc-focus-ring-rail`, plus a unit test failing below 3.0 | One token cannot serve both surfaces, and the 7 nav links live on the failing one. The test is what turns the standard into a guarantee instead of a memory. |
+| 2 | Three notification toggles ship permanently `disabled=True` | **2A** — cut them, keep a one-line statement | A control that cannot be operated has not earned its pixels. The Security panel already uses statements over dead switches. Also removes 3 of the 33 controls the contract must cover. |
+| 3 | The explainer sits behind a 47-character collapsed expander | **3A** — info icon in the app bar, expander retires, popover heading becomes "How a ticket gets escalated" | The grammar problem dissolves rather than being reworded, and this is T8's component, so the other six pages get their icon from the same build. |
+| 4 | A focus ring on the slider is a lie until ISSUE-002 is fixed | **4A** — T1/T2 first, then define, apply, assert | `/qa` measured focus dropping to `<body>` after every slider change. A ring on that control tells the user they hold the handle when they do not. |
+
+### Scope note
+
+These four asks need **11 tasks**; the plan above has 17. The other six (T3/T4 font
+scale, T7 message-box padding, T10 account control, T14 mobile-at-largest-font) come
+from the earlier nine-item list and are not required by anything in round 2. Carried,
+not cut, but named so the commitment is visible.
+
+### Build order
+
+```
+  1. T1   ui/prefs.py substrate
+  2. T2   slider + selectbox stop remounting        <- unblocks the ring AND point 4
+  3.      interaction contract: 4 states x each control class, as tokens
+  4.      apply to all 30 controls (33 minus the 3 cut)
+  5.      assert: focus rule per class + focus-ring contrast >= 3:1 both surfaces
+  6. T8   page_help component + 7 call sites         <- points 1 and 2
+  7. T6   humanize()   T9 safety-net + lift   ISSUE-008 chart   <- point 4 exit criteria
+  8. T11  ARIA names   T13 stale comments
+```
+
+### Open risk carried into implementation
+
+The CSS assertion proves *our sheet declares a rule*. It cannot prove *Streamlit still
+emits that testid*. A version bump renaming `stBaseButton-secondary` leaves the test
+green and the focus ring gone — the same silent-degradation class TODOS.md already
+tracks. Pair the CSS assertions with at least one rendered check.
+
 ## What this plan did not get
 
 An independent second-model review of this document did not run — the tool that
