@@ -876,3 +876,43 @@ def test_dark_theme_reaches_inside_portaled_popovers():
     body = rule.group(1)
     assert "var(--tc-surface)" in body, "the button fill must follow the theme token"
     assert "var(--tc-text)" in body, "the button label must follow the theme token"
+
+
+# Regression: ISSUE-006 — the statistics rail is shared by Tickets and Safety-net
+# escalations. On the escalation page every ticket in view triggered the net by
+# definition, so "Safety net 1,525" simply restated the "1,525 tickets" header a
+# few hundred pixels to its left. On Tickets the same figure is real information:
+# how much of the queue the scorer overrode. Found by /qa on 2026-08-01.
+# Report: .gstack/qa-reports/qa-report-localhost-2026-08-01.md
+def test_safety_net_rail_drops_a_count_that_is_always_the_whole_page():
+    from ui.views import tickets as tickets_view
+
+    escalated = [
+        {"id": "T1", "category": "Critical", "score": 70, "safety_net_triggered": True},
+        {"id": "T2", "category": "High", "score": 70, "safety_net_triggered": True},
+    ]
+    mixed = escalated + [
+        {"id": "T3", "category": "Low", "score": 30, "safety_net_triggered": False},
+    ]
+
+    def rail_labels(batch):
+        script = (
+            "from ui.views import tickets\n"
+            f"tickets._statistics_rail({batch!r})\n"
+        )
+        at = AppTest.from_string(script, default_timeout=90).run()
+        assert not at.exception, at.exception
+        return _html(at)
+
+    all_escalated = rail_labels(escalated)
+    assert "Safety net" not in all_escalated, (
+        "on a page where every ticket triggered the net, the count restates the "
+        "header and must not be shown"
+    )
+    assert "Critical" in all_escalated, "the informative counts must survive"
+
+    partly = rail_labels(mixed)
+    assert "Safety net" in partly, (
+        "on a mixed queue the safety-net count is real information about how "
+        "much of it the scorer overrode"
+    )

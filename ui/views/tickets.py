@@ -7,7 +7,7 @@ take you somewhere else. ``ui.state`` holds the open-tab list.
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import streamlit as st
 
@@ -95,15 +95,26 @@ def _statistics_rail(tickets: List[Dict]) -> None:
     breached = sum(1 for t in tickets if domain.sla_breached(t))
     net = sum(1 for t in tickets if t.get("safety_net_triggered"))
 
+    # The safety-net count earns its place on Tickets, where it says how much of
+    # the queue the scorer overrode. On Safety-net escalations every ticket in
+    # view triggered it by definition, so the figure just restated the header:
+    # "1,525 tickets" on the left, "Safety net 1,525" on the right. Two identical
+    # numbers on one screen reads as a coincidence worth checking rather than a
+    # tautology, which costs the reader attention for nothing.
+    #
+    # Derived here rather than passed in as a flag. `render_queue` already takes
+    # five parameters and a sixth boolean is the shape this file is trying not to
+    # grow; the rail can see the answer in the data it was handed.
+    # Found by /qa (ISSUE-006).
+    stats: List[Tuple[str, object, str]] = [
+        ("Critical", counts["Critical"], "var(--tc-critical)"),
+        ("High", counts["High"], "var(--tc-high)"),
+    ]
+    if tickets and net < len(tickets):
+        stats.append(("Safety net", net, "var(--tc-primary)"))
+
     with st.container(border=True):
-        c.stat_block(
-            "Triage statistics", "Tickets in view",
-            [
-                ("Critical", counts["Critical"], "var(--tc-critical)"),
-                ("High", counts["High"], "var(--tc-high)"),
-                ("Safety net", net, "var(--tc-primary)"),
-            ],
-        )
+        c.stat_block("Triage statistics", "Tickets in view", stats)
         st.caption(f"{c.count(breached)} past SLA target")
 
     with st.container(border=True):
