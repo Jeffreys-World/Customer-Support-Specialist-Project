@@ -194,7 +194,16 @@ def _composer(ticket: Dict) -> None:
             )
         with right:
             if new_cat == current:
-                if st.button("Submit as Open", key=f"confirm_{ticket['id']}",
+                # "Submit as Open" named a *status*, in the one control on the page
+                # that sets a *priority*. It was wrong three ways at once: nothing
+                # here writes status, so the claim was never true; the ticket beside
+                # it read "Pending Customer Response", so the label contradicted the
+                # properties panel; and the override branch below renders "Submit as
+                # High", so the same phrase meant two different fields depending on
+                # a dropdown. The toast has always said "Confirmed … as Critical" —
+                # this makes the button agree with the toast. Found by /qa
+                # (ISSUE-103).
+                if st.button(f"Confirm as {current}", key=f"confirm_{ticket['id']}",
                              type="primary", use_container_width=True):
                     domain.log_override(ticket["id"], current, current, "confirm")
                     state.set_last_action(f"Confirmed #{ticket['id']} as {current}.")
