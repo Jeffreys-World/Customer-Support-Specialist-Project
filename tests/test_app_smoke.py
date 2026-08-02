@@ -1142,3 +1142,263 @@ def test_no_raw_lowercase_dataset_label_reaches_the_queue():
     for raw in ("Refund request", "Billing inquiry", "Product inquiry",
                 "Technical issue", "Cancellation request", "Social media"):
         assert raw not in body, f"{raw!r} reached the DOM uncased"
+
+
+# --- /qa 2026-08-01, round 3 --------------------------------------------------
+
+# Regression: ISSUE-101 — `following.py` kept its own copy of the open-detail
+# branch instead of routing through `tickets.open_detail_or`, so the ISSUE-003
+# guard that taught Safety-net escalations to refuse foreign tickets never
+# reached it. Observed live: with only T00025 starred and unfollowed T00032 open,
+# clicking "Following" in the rail rendered T00032's detail view, its own button
+# reading "Follow", while the ticket actually being watched stayed hidden.
+# Found by /qa on 2026-08-01.
+# Report: .gstack/qa-reports/qa-report-localhost-2026-08-01-round3.md
+def test_following_does_not_open_a_ticket_it_is_not_watching():
+    script = (
+        "from ui.views import following\n"
+        "from ui import state, domain\n"
+        "ts = domain.load_tickets()\n"
+        "if len(ts) > 1:\n"
+        "    state.toggle_following(ts[0]['id'])\n"
+        "    state.open_ticket(ts[1]['id'])\n"
+        "following.render()\n"
+    )
+    at = AppTest.from_string(script, default_timeout=120).run()
+    assert not at.exception, at.exception
+
+    body = _html(at)
+    assert "watching" in body, (
+        "an unfollowed ticket must fall through to this page's own list, not "
+        "hijack it - the destination is defined by what is starred"
+    )
+    assert "tc-note" not in body, (
+        "the rationale panel belongs to the detail view; its presence means a "
+        "ticket was opened inline on a page that does not own it"
+    )
+
+
+# The other half of ISSUE-101, mirroring the ISSUE-003 pair: the guard must not
+# over-correct into "Following never opens anything". Opening a ticket you *are*
+# watching is the intended behaviour.
+def test_following_still_opens_a_ticket_it_is_watching():
+    script = (
+        "from ui.views import following\n"
+        "from ui import state, domain\n"
+        "ts = domain.load_tickets()\n"
+        "if ts:\n"
+        "    state.toggle_following(ts[0]['id'])\n"
+        "    state.open_ticket(ts[0]['id'])\n"
+        "following.render()\n"
+    )
+    at = AppTest.from_string(script, default_timeout=120).run()
+    assert not at.exception, at.exception
+    assert "tc-note" in _html(at), (
+        "a followed ticket must still open inline on the Following page"
+    )
+
+
+# Both non-queue destinations must share one guard. This is the structural half:
+# ISSUE-101 existed only because a second page hand-rolled the branch, so assert
+# that neither of them does that again.
+def test_non_queue_destinations_share_one_open_detail_guard():
+    from pathlib import Path
+
+    src = _code_of("ui", "views", "following.py")
+    assert "open_detail_or" in src, (
+        "Following must route through the shared guard rather than re-implementing "
+        "the open-detail branch - that duplication was ISSUE-101"
+    )
+    assert "ticket_detail.render" not in src, (
+        "calling ticket_detail.render directly bypasses the belongs_here check"
+    )
+
+
+def _code_of(*parts) -> str:
+    """Source of a repo file with comments stripped.
+
+    These assertions are about what the module *does*, and every one of these
+    fixes ships a comment quoting the string it removed. Matching raw source
+    would let the explanation of a bug re-trigger the test for it.
+    """
+    from pathlib import Path
+
+    src = Path(__file__).resolve().parents[1].joinpath(*parts).read_text(encoding="utf-8")
+    out = []
+    for line in src.splitlines():
+        quote = None
+        for i, ch in enumerate(line):
+            if quote:
+                if ch == quote and line[i - 1] != "\\":
+                    quote = None
+            elif ch in "\"'":
+                quote = ch
+            elif ch == "#":
+                line = line[:i]
+                break
+        out.append(line)
+    return "\n".join(out)
+
+
+def _composite(fg_rgb, alpha, bg_hex):
+    """Flatten an rgba() chip fill over an opaque surface, as the browser does."""
+    bg = bg_hex.lstrip("#")
+    out = []
+    for i, channel in enumerate((0, 2, 4)):
+        base = int(bg[channel:channel + 2], 16)
+        out.append(round(fg_rgb[i] * alpha + base * (1 - alpha)))
+    return "#%02X%02X%02X" % tuple(out)
+
+
+# Regression: ISSUE-102 - Streamlit ships a bare
+# `code { background: #FAFBFC; color: #09AB3B }` from its light theme. Only
+# `.tc-integrity code` and `.tc-explain__net code` overrode it, so every other
+# backticked span kept Streamlit's green on its near-white chip. Measured on
+# Settings: eight chips, all eight failing in dark (2.42:1 and 2.94:1 against a
+# 4.5:1 floor) and six of eight in light. Found by /qa on 2026-08-01.
+# Report: .gstack/qa-reports/qa-report-localhost-2026-08-01-round3.md
+def test_inline_code_chips_are_themed_not_left_to_streamlit():
+    css = _css()
+    rule = re.search(r":not\(pre\)\s*>\s*code\s*\{([^}]*)\}", css)
+    assert rule, (
+        "the base sheet must theme inline code spans; leaving the element to "
+        "Streamlit's light-theme default was ISSUE-102"
+    )
+    body = rule.group(1)
+    assert "var(--tc-text)" in body, (
+        "the chip's text must follow the theme token, not Streamlit's #09AB3B"
+    )
+    assert "rgba(" in body, (
+        "the fill must be translucent so one rule composites over either theme - "
+        "an opaque light hex here is the bug this replaced"
+    )
+
+
+def test_inline_code_chips_clear_aa_in_both_themes():
+    """The chip fill is translucent, so contrast depends on what it sits on."""
+    assert _ratio(_composite((127, 127, 127), 0.14, "#FFFFFF"), "#2F3941") >= 4.5, (
+        "light mode: --tc-text on the chip fill over a white card"
+    )
+    assert _ratio(_composite((127, 127, 127), 0.14, "#1F2933"), "#E4E9ED") >= 4.5, (
+        "dark mode: --tc-text on the chip fill over --tc-surface"
+    )
+    # What it replaced, so the numbers in the report stay checkable.
+    assert _ratio("#FAFBFC", "#09AB3B") < 4.5
+
+
+def test_code_inside_a_caption_opts_out_of_the_muted_colour():
+    css = _css()
+    assert re.search(
+        r'\[data-testid="stCaptionContainer"\]\s*code\s*\{[^}]*var\(--tc-text\)',
+        css,
+    ), (
+        "captions paint every descendant --tc-muted at (0,2,0), which outranks the "
+        "inline-code rule and left 4.14:1 on the captions that name a file or flag; "
+        "a chip is a token to be read exactly, not de-emphasised prose"
+    )
+
+
+# Regression: ISSUE-103 - the primary action read "Submit as Open", naming a
+# status in the one control that sets a priority. Nothing in `_composer` writes
+# status (verified live: the ticket read "Pending Customer Response" before and
+# after the click), the properties panel therefore contradicted it, and the
+# override branch beside it renders "Submit as High" - the same phrase meaning a
+# different field depending on a dropdown. Found by /qa on 2026-08-01.
+# Report: .gstack/qa-reports/qa-report-localhost-2026-08-01-round3.md
+def test_confirm_button_names_a_priority_not_a_status():
+    src = _code_of("ui", "views", "ticket_detail.py")
+    assert '"Submit as Open"' not in src, (
+        "the confirm button must not name a status; nothing here writes one"
+    )
+    assert 'f"Confirm as {current}"' in src, (
+        "the confirm button must name the priority it is confirming, matching the "
+        "toast and override_log's action=confirm"
+    )
+
+
+def test_confirm_button_renders_the_current_priority():
+    """End to end: the label must carry a real Category value, not a status."""
+    from src.schema import Category
+
+    script = (
+        "from ui.views import tickets\n"
+        "from ui import state, domain\n"
+        "ts = domain.load_tickets()\n"
+        "if ts:\n"
+        "    state.open_ticket(ts[0]['id'])\n"
+        "tickets.render()\n"
+    )
+    at = AppTest.from_string(script, default_timeout=120).run()
+    assert not at.exception, at.exception
+
+    labels = [b.label for b in at.button]
+    confirm = [x for x in labels if x.startswith("Confirm as ")]
+    assert confirm, "no confirm button rendered; saw %r" % (labels,)
+    named = confirm[0].removeprefix("Confirm as ")
+    assert named in {c.value for c in Category}, (
+        "%r is not a priority - the button must name a Category, and 'Open' "
+        "(a status) is exactly what ISSUE-103 was" % (named,)
+    )
+
+
+# Regression: ISSUE-104 - `height=460` was flat regardless of content, so the
+# review log rendered its rows and then roughly a dozen blank striped ones. With
+# one review, the state every reviewer sees first, the panel read as a table that
+# had failed to load. Measured 460px for a single 35px row.
+# Found by /qa on 2026-08-01.
+# Report: .gstack/qa-reports/qa-report-localhost-2026-08-01-round3.md
+def test_review_log_height_tracks_its_row_count():
+    src = _code_of("ui", "views", "completed.py")
+    assert "height=460" not in src, (
+        "a flat height paints blank grid rows under a short log"
+    )
+    assert re.search(r"min\(\s*460\s*,[^)]*len\(df\)", src), (
+        "height must scale with the rows present and stay capped so a long log "
+        "scrolls rather than pushing the page"
+    )
+    # The arithmetic itself, so a future edit cannot silently invert the cap.
+    def height(n):
+        return min(460, 38 + 35 * n)
+
+    assert height(1) < 100, "one review must not reserve a screen of blank rows"
+    assert height(3) == 143
+    assert height(50) == 460, "the cap must still hold for a long log"
+
+
+# Regression: ISSUE-105 - the sort column held 2 of 12 units while carrying a
+# whole word plus a chevron, where its neighbours show a one-word placeholder.
+# Measured at 1440x900: 114px of label in a 105px box, rendering "Recommen..." on
+# the one control that states how the queue below it is ordered.
+# Found by /qa on 2026-08-01.
+# Report: .gstack/qa-reports/qa-report-localhost-2026-08-01-round3.md
+def test_sort_column_is_not_narrower_than_the_filters_beside_it():
+    from pathlib import Path
+
+    src = _code_of("ui", "components.py")
+    match = re.search(
+        r"widths\s*=\s*\[([\d,\s]+)\]\s*if\s*show_queue\s*else\s*\[([\d,\s]+)\]", src
+    )
+    assert match, "filter_row must keep declaring both column-width variants"
+
+    for variant, raw in (("show_queue", match.group(1)), ("no queue", match.group(2))):
+        widths = [int(n) for n in raw.split(",")]
+        # The sort control is always last and always renders a full word.
+        neighbours = widths[1:-1] or [0]
+        assert widths[-1] >= max(neighbours), (
+            "%s: the sort column (%d) is narrower than a filter beside it (%r), "
+            "which is what clipped 'Recommended'" % (variant, widths[-1], neighbours)
+        )
+
+
+def test_every_sort_option_is_short_enough_for_its_column():
+    """The fix widened the column rather than shortening the words - so the words
+    must stay within what that column can hold."""
+    from ui.domain import SORT_OPTIONS
+
+    # "Recommended" measured 114px at the shipped font; the widened column holds
+    # it exactly. Character count is the portable proxy for that budget.
+    for option in SORT_OPTIONS:
+        assert len(option) <= len("Recommended") + 2, (
+            "%r is wider than the column was sized for - widen the column with it "
+            "rather than letting it clip" % (option,)
+        )
