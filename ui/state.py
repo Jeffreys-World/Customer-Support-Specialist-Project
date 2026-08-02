@@ -11,6 +11,8 @@ from typing import Dict, List, Optional
 
 import streamlit as st
 
+from ui import prefs
+
 _OPEN_TABS = "open_ticket_ids"   # ticket ids currently open as tabs
 _ACTIVE = "active_ticket_id"     # which tab is focused
 _FOLLOWING = "following_ids"     # "Shared work → Following"
@@ -18,24 +20,24 @@ _LAST_ACTION = "last_action"     # confirm/override toast text
 
 # Settings-page preferences.
 #
-# Each preference has TWO keys, and the split is load-bearing. Streamlit garbage-
-# collects session_state entries whose widget was not rendered during the current
-# script run. The Settings widgets only exist on the Settings page, so binding a
-# widget's `key` directly to the preference meant the value was discarded the
-# moment the agent navigated anywhere else: the preference never reached Home or
-# Tickets, and returning to Settings showed it reset to the default. Found by /qa
-# (ISSUE-009) — every unit test passed, because none of them navigated.
+# The two-key split and the reasoning behind it now live in `ui/prefs.py`, which
+# owns every durable preference on one pattern. This module re-exports the names
+# so existing call sites and tests keep working, and so `ui.state` stays the
+# place a view looks for session concerns generally.
 #
-# So the widget owns the `_W_*` key, and an on_change callback copies its value
-# into the durable `*_KEY`. A key that is never a widget key is never collected.
-ATTENTION_LIMIT_KEY = "pref_attention_limit"
-DEFAULT_SORT_KEY = "pref_default_sort"
-W_ATTENTION_LIMIT = "_w_attention_limit"
-W_DEFAULT_SORT = "_w_default_sort"
+# The split is still load-bearing, and the short version is: Streamlit collects
+# session_state entries whose widget was not rendered in the current run, so the
+# durable key must never be a widget key (ISSUE-009). The newer half of the rule
+# is that the widget must never be handed a `value=`/`index=` either, or it
+# re-mounts on every rerun and drops keyboard focus (ISSUE-002). See prefs.py.
+ATTENTION_LIMIT_KEY = prefs.ATTENTION_LIMIT
+DEFAULT_SORT_KEY = prefs.DEFAULT_SORT
+W_ATTENTION_LIMIT = prefs.W_ATTENTION_LIMIT
+W_DEFAULT_SORT = prefs.W_DEFAULT_SORT
 
 MAX_TABS = 6  # Zendesk caps the visible tab strip too; past this the oldest closes
 
-DEFAULT_ATTENTION_LIMIT = 6
+DEFAULT_ATTENTION_LIMIT = prefs.DEFAULT_ATTENTION_LIMIT
 
 
 def _init() -> None:
@@ -96,27 +98,24 @@ def toggle_following(ticket_id: str) -> bool:
 
 def attention_limit() -> int:
     """How many tickets Home's 'Needs attention now' list shows."""
-    return int(st.session_state.get(ATTENTION_LIMIT_KEY, DEFAULT_ATTENTION_LIMIT))
+    return prefs.attention_limit()
 
 
 def default_sort() -> str:
     """Which sort the Tickets view opens with."""
     from ui.domain import SORT_OPTIONS  # local import avoids a cycle at module load
 
-    value = st.session_state.get(DEFAULT_SORT_KEY, SORT_OPTIONS[0])
-    return value if value in SORT_OPTIONS else SORT_OPTIONS[0]
+    return prefs.default_sort(SORT_OPTIONS)
 
 
 def persist_attention_limit() -> None:
-    """Copy the Settings slider's value into the durable key. See the key block."""
-    if W_ATTENTION_LIMIT in st.session_state:
-        st.session_state[ATTENTION_LIMIT_KEY] = int(st.session_state[W_ATTENTION_LIMIT])
+    """Copy the Settings slider's value into the durable key. See ``ui/prefs.py``."""
+    prefs.persist(W_ATTENTION_LIMIT, ATTENTION_LIMIT_KEY)
 
 
 def persist_default_sort() -> None:
-    """Copy the Settings selectbox's value into the durable key. See the key block."""
-    if W_DEFAULT_SORT in st.session_state:
-        st.session_state[DEFAULT_SORT_KEY] = st.session_state[W_DEFAULT_SORT]
+    """Copy the Settings selectbox's value into the durable key. See ``ui/prefs.py``."""
+    prefs.persist(W_DEFAULT_SORT, DEFAULT_SORT_KEY)
 
 
 def set_last_action(message: str) -> None:

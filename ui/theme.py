@@ -27,6 +27,7 @@ from typing import Dict, Union
 import streamlit as st
 
 from src.schema import Category
+from ui import prefs
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CSS_PATH = REPO_ROOT / ".streamlit" / "styles.css"
@@ -147,29 +148,18 @@ def priority(category: Union[Category, str]) -> PriorityToken:
 def is_dark() -> bool:
     """Is the console currently in dark mode?
 
-    Session state is the live answer, with the URL as the fallback. Both are
-    needed: clicking between pages keeps one Streamlit session alive, so session
-    state carries the theme, but a browser refresh or an opened deep link starts
-    a *new* session with empty state. Without the query-parameter fallback, a
-    reload silently dropped the user back into light mode — found by loading
-    /dashboard directly after switching the theme on /settings.
+    Delegates to :mod:`ui.prefs`, which owns every durable preference on one
+    pattern. This function stays as the name the rest of the console calls, so
+    the split is invisible at the call sites, but the state itself no longer
+    lives here — this module decides how things *look*, which is what its own
+    docstring has always claimed.
     """
-    if _THEME_KEY in st.session_state:
-        return st.session_state[_THEME_KEY] == "dark"
-    return st.query_params.get(_THEME_PARAM) == "dark"
+    return prefs.is_dark()
 
 
 def set_dark(enabled: bool) -> None:
-    """Set the theme. Backs the Settings toggle.
-
-    Mirrors into the query string so the choice survives a reload and travels
-    with a copied URL.
-    """
-    st.session_state[_THEME_KEY] = "dark" if enabled else "light"
-    if enabled:
-        st.query_params[_THEME_PARAM] = "dark"
-    elif _THEME_PARAM in st.query_params:
-        del st.query_params[_THEME_PARAM]
+    """Set the theme. Backs the Settings toggle. See :mod:`ui.prefs`."""
+    prefs.set_dark(enabled)
 
 
 # --- Stylesheet ---------------------------------------------------------------
