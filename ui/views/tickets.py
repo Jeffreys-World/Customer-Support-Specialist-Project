@@ -134,7 +134,7 @@ def _statistics_rail(tickets: List[Dict]) -> None:
 
 # --- Navigation entry points --------------------------------------------------
 
-def _open_detail_or(render_list, belongs_here=None) -> None:
+def open_detail_or(render_list, belongs_here=None) -> None:
     """Show the detail view when a ticket is open, otherwise the list.
 
     ``belongs_here`` decides whether *this* destination is willing to open a
@@ -158,7 +158,7 @@ def _open_detail_or(render_list, belongs_here=None) -> None:
 
 
 def render() -> None:
-    _open_detail_or(
+    open_detail_or(
         lambda tickets: render_queue(
             tickets,
             "Tickets",
@@ -206,4 +206,4 @@ def render_safety_net() -> None:
 
     # Only escalated tickets open inline here. Anything else opened elsewhere
     # falls through to this page's own list rather than hijacking it.
-    _open_detail_or(_list, belongs_here=lambda t: bool(t.get("safety_net_triggered")))
+    open_detail_or(_list, belongs_here=lambda t: bool(t.get("safety_net_triggered")))

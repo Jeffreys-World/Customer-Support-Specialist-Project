@@ -771,7 +771,7 @@ def test_ticket_detail_renders_with_a_ticket_open():
     assert "tc-pill--demo" in body
 
 
-# Regression: ISSUE-003 — both queue pages route through `_open_detail_or` and
+# Regression: ISSUE-003 — both queue pages route through `open_detail_or` and
 # share the open-tab state, so opening a ticket on Tickets and then clicking
 # "Safety-net escalations" rendered that same ticket's detail under the
 # escalation heading. Observed live with a ticket whose own Safety net field read
