@@ -15,4 +15,4 @@ pytest>=8.0,<9.0
 # ceiling experiment (results/priority_prediction.md). The console never imports
 # it — tests/test_prediction_model.py asserts that — so a deployment without
 # scikit-learn still runs the app.
-scikit-learn>=1.3,<2.0
+# scikit-learn>=1.3,<2.0
