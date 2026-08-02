@@ -779,6 +779,41 @@ html { font-size: 112.5%; }
   padding: 0.05rem 0.25rem;
 }
 
+/* --- Inline code spans ----------------------------------------------------- */
+
+/* Streamlit ships a bare `code { background: #FAFBFC; color: #09AB3B }` from its
+   light theme, and nothing here overrode the *element* — only the two containers
+   just above and in the explainer block. Every other backticked span therefore
+   kept Streamlit's green on its near-white chip: 2.94:1 against a 4.5:1 floor,
+   failing in BOTH themes, and in dark mode also rendering as a bright chip punched
+   into a dark card. Measured on Settings, the page that states this project's
+   security claims: eight chips, all eight failing in dark, six of eight in light.
+
+   This belongs in the base sheet rather than `styles-dark.css` because it is not a
+   dark-mode bug — dark mode only made it visible. The translucent grey is the idiom
+   `.tc-integrity code` already uses: it composites correctly over either theme, so
+   one rule serves both, and `--tc-text` follows whichever theme is active
+   (10.3:1 light, 11.8:1 dark).
+
+   `:not(pre) > code` scopes this to inline spans. There are no `st.code` blocks
+   today; this way adding one later keeps its own syntax highlighting instead of
+   inheriting a chip built for prose. The two container rules above still win on
+   specificity (0,1,1 over 0,0,2) and keep their tuned size and padding — they never
+   set a colour, so they take it from here. Found by /qa (ISSUE-102). */
+:not(pre) > code {
+  background: rgba(127, 127, 127, 0.14);
+  color: var(--tc-text);
+}
+
+/* Captions paint every descendant `--tc-muted` at specificity (0,2,0), which wins
+   over the rule above and puts muted grey on the chip's own tint — 4.14:1, still
+   under the floor, in exactly the captions that name a file or a flag. Muted is
+   right for caption prose and wrong for a chip inside it: the chip is a token to be
+   read exactly, not de-emphasised text. This opts it back out at (0,2,1). */
+[data-testid="stMainBlockContainer"] [data-testid="stCaptionContainer"] code {
+  color: var(--tc-text);
+}
+
 /* --- "How priority is decided" explainer ---------------------------------- */
 /* Rendered by `ui.components.scorer_explainer`. Laid out as aligned rows rather
    than a <table>: every row is a weight paired with a label, the column widths
