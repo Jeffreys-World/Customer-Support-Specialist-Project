@@ -43,7 +43,16 @@ def render() -> None:
             "agent_category": "You said",
             "action": "Action",
         })
-        st.dataframe(df, use_container_width=True, hide_index=True, height=460)
+        # Height tracks the rows there actually are, capped so a long log scrolls
+        # instead of pushing the page. A flat height=460 meant the first review a
+        # reviewer logs sat above roughly a dozen blank striped rows — the panel
+        # read as a table that had failed to load rather than one with a single
+        # entry, on the page whose entire job is showing that the log works.
+        # 35px/row + 38px header matches Streamlit's own grid metrics.
+        st.dataframe(
+            df, use_container_width=True, hide_index=True,
+            height=min(460, 38 + 35 * len(df)),
+        )
 
     with right:
         with st.container(border=True):
