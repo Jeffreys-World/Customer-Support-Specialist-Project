@@ -1004,3 +1004,91 @@ def test_notifications_panel_has_no_dead_toggles():
         assert dead not in labels, f"{dead!r} is a control that does nothing"
     # Dark mode is a real preference and must survive the cut.
     assert "Dark mode" in labels, "the one working toggle must remain"
+
+
+# Regression: ISSUE-002 — the ISSUE-009 fix kept `value=`/`index=` on the Settings
+# widgets, recomputed from the durable key. That looked harmless and re-mounted
+# each widget on every rerun, which DROPPED KEYBOARD FOCUS. Measured in a browser:
+# starting at 3 and pressing Right five times to reach 8 produced 4, 4, 4, 4, 4 --
+# the first press landed, then focus fell to <body> and the rest went nowhere.
+# The user reported it as "the Tickets bar glitches from 3 to 8".
+# Found by /qa on 2026-08-01.
+# Report: .gstack/qa-reports/qa-report-localhost-2026-08-01.md
+def test_settings_widgets_are_never_handed_a_value():
+    """A widget with both a key and a recomputed value re-mounts and loses focus."""
+    from pathlib import Path
+
+    src = (
+        Path(__file__).resolve().parents[1] / "ui" / "views" / "settings.py"
+    ).read_text(encoding="utf-8")
+
+    slider = re.search(r"st\.slider\((.*?)\n        \)", src, re.S)
+    assert slider, "the Home-list slider is missing"
+    # `value=` as its own keyword, not the tail of min_value=/max_value=, which
+    # are the range and are required.
+    assert not re.search(r"(?<![_a-zA-Z])value=", slider.group(1)), (
+        "the slider must not be given value= — that prop changes every rerun, "
+        "re-mounts the widget, and drops keyboard focus (ISSUE-002)"
+    )
+
+    selectbox = re.search(r"st\.selectbox\((.*?)\n        \)", src, re.S)
+    assert selectbox, "the default-sort selectbox is missing"
+    assert not re.search(r"(?<![_a-zA-Z])index=", selectbox.group(1)), (
+        "the selectbox must not be given index= — same re-mount problem as the "
+        "slider, and it is the twin defect that was never reported"
+    )
+
+
+def test_bind_seeds_only_when_the_widget_key_is_absent():
+    """Present means the widget is mid-interaction and owns the truth."""
+    script = (
+        "import streamlit as st\n"
+        "from ui import prefs\n"
+        "st.session_state[prefs.ATTENTION_LIMIT] = 11\n"
+        "prefs.bind(prefs.W_ATTENTION_LIMIT, prefs.ATTENTION_LIMIT, 6)\n"
+        "first = st.session_state[prefs.W_ATTENTION_LIMIT]\n"
+        "# a later rerun must NOT clobber what the user is currently dragging\n"
+        "st.session_state[prefs.W_ATTENTION_LIMIT] = 15\n"
+        "prefs.bind(prefs.W_ATTENTION_LIMIT, prefs.ATTENTION_LIMIT, 6)\n"
+        "st.write(f'seeded={first} kept={st.session_state[prefs.W_ATTENTION_LIMIT]}')\n"
+    )
+    at = AppTest.from_string(script, default_timeout=60).run()
+    assert not at.exception, at.exception
+    body = "\n".join(str(m.value) for m in at.markdown)
+    assert "seeded=11 kept=15" in body, body
+
+
+def test_bind_coerces_a_stored_value_that_is_out_of_range():
+    """A saved 20 against a slider that stops at 15 would make Streamlit raise."""
+    from ui import prefs
+
+    assert prefs.clamp_attention_limit(20) == prefs.ATTENTION_LIMIT_MAX
+    assert prefs.clamp_attention_limit(1) == prefs.ATTENTION_LIMIT_MIN
+    assert prefs.clamp_attention_limit("8") == 8
+
+
+def test_attention_limit_survives_a_junk_stored_value():
+    """Shadow path: anything non-numeric must fall back, never raise."""
+    script = (
+        "import streamlit as st\n"
+        "from ui import prefs\n"
+        "st.session_state[prefs.ATTENTION_LIMIT] = 'banana'\n"
+        "st.write(f'limit={prefs.attention_limit()}')\n"
+    )
+    at = AppTest.from_string(script, default_timeout=60).run()
+    assert not at.exception, at.exception
+    body = "\n".join(str(m.value) for m in at.markdown)
+    assert f"limit={6}" in body, body
+
+
+def test_prefs_is_the_base_layer_and_imports_nothing_from_ui():
+    """theme.py and state.py both depend on prefs, so it must sit below them."""
+    from pathlib import Path
+
+    src = (
+        Path(__file__).resolve().parents[1] / "ui" / "prefs.py"
+    ).read_text(encoding="utf-8")
+    assert not re.search(r"^\s*(from|import)\s+ui\b", src, re.M), (
+        "ui/prefs.py must import nothing from ui/ — it is the base of the graph, "
+        "and a cycle here is what the local-import dodges elsewhere existed for"
+    )

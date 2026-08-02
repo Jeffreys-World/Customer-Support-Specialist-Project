@@ -26,7 +26,7 @@ from __future__ import annotations
 import streamlit as st
 
 from ui import components as c
-from ui import domain, state, theme
+from ui import domain, prefs, state, theme
 
 
 def render() -> None:
@@ -142,24 +142,43 @@ def _preferences() -> None:
     with st.container(border=True):
         c.panel_title("Preferences")
 
-        # The widget writes to its own `_w_*` key and an on_change callback copies
-        # the value to the durable preference key. Binding the widget straight to
-        # the preference key looked correct and silently did nothing: Streamlit
-        # collects widget state for widgets absent from the current script run, so
-        # the value vanished on navigation and never reached Home or Tickets.
-        # See the key block in `ui/state.py` (ISSUE-009).
+        # Each widget owns its own `_w_*` key; an on_change callback copies the
+        # value into the durable preference key. Binding a widget straight to the
+        # durable key silently did nothing, because Streamlit collects widget
+        # state for widgets absent from the current run, so the value vanished on
+        # navigation and never reached Home or Tickets (ISSUE-009).
+        #
+        # Neither widget is given a `value=` or `index=`, and that absence is the
+        # fix for ISSUE-002. Passing one recomputed from the durable key looked
+        # harmless and re-mounted the widget on every rerun, which dropped
+        # keyboard focus: from 3, five Right presses to reach 8 produced
+        # 4, 4, 4, 4, 4 — the first landed, then focus fell to <body>.
+        #
+        # `bind` seeds the widget key only when it is absent, which is exactly
+        # when Streamlit collected it. So the preference survives navigation
+        # without the widget ever being handed a changing prop.
+        prefs.bind(
+            state.W_ATTENTION_LIMIT, state.ATTENTION_LIMIT_KEY,
+            state.DEFAULT_ATTENTION_LIMIT, coerce=prefs.clamp_attention_limit,
+        )
         st.slider(
-            "Tickets shown on Home", min_value=3, max_value=15,
-            value=state.attention_limit(), key=state.W_ATTENTION_LIMIT,
-            on_change=state.persist_attention_limit,
+            "Tickets shown on Home",
+            min_value=prefs.ATTENTION_LIMIT_MIN, max_value=prefs.ATTENTION_LIMIT_MAX,
+            key=state.W_ATTENTION_LIMIT,
+            on_change=prefs.persist,
+            args=(state.W_ATTENTION_LIMIT, state.ATTENTION_LIMIT_KEY),
             help="How many tickets the Home 'Needs attention now' list shows.",
+        )
+        prefs.bind(
+            state.W_DEFAULT_SORT, state.DEFAULT_SORT_KEY, domain.SORT_OPTIONS[0],
+            coerce=lambda v: v if v in domain.SORT_OPTIONS else domain.SORT_OPTIONS[0],
         )
         st.selectbox(
             "Default queue sort",
             domain.SORT_OPTIONS,
-            index=domain.SORT_OPTIONS.index(state.default_sort()),
             key=state.W_DEFAULT_SORT,
-            on_change=state.persist_default_sort,
+            on_change=prefs.persist,
+            args=(state.W_DEFAULT_SORT, state.DEFAULT_SORT_KEY),
             help="Which sort the Tickets view opens with.",
         )
         st.caption(
