@@ -134,45 +134,86 @@ the change most likely to break styling silently.
 **Depends on / blocked by:** The UI clarity plan ships first; the computed-style assertions
 ship before the split.
 
-## Dashboard: a stacked chart is rendering from an empty dataset
+## The navigation rail marks the current page by colour alone
 
-**What:** Vega logs `Infinite extent for field "Tickets_end": [Infinity, -Infinity]`
-(and `Tickets_start`, `Tickets`) on every Dashboard load. Identify which stacked
-chart is receiving zero rows and either stop rendering it or say why it is empty.
+**What:** All seven `stSidebarNavLink` elements report `aria-current: null`, including
+the active one. The current destination is conveyed only by a background colour —
+`rgba(153,173,194,0.25)` against `rgba(0,0,0,0)`. A screen-reader user gets no
+indication of where they are.
 
-**Why:** Surfaced by `/qa` on 2026-08-01 during the post-fix verification sweep.
-`[Infinity, -Infinity]` is Vega's empty-domain sentinel: it computes a range from
-no data. `_start`/`_end` are the fields Vega generates when it *stacks* a
-quantitative field.
+**Why:** Surfaced by `/qa` on 2026-08-01 (ISSUE-106). It is also the unaddressed half of
+a symptom the ISSUE-003 pass noted — "the rail gave no clue you had arrived somewhere" —
+which that fix resolved for sighted users only.
 
-**Correction (2026-08-01, second `/qa` pass):** the original hypothesis in this
-entry — "a chart is being handed zero rows" — was checked and is **wrong**. Both
-stacked charts on the page are the donuts in `_donut`, and both are guarded:
-`if channel:` at `ui/views/dashboard.py:284` and `if status["counts"]:` at
-`:303`, each falling through to an empty state. The underlying data is fully
-populated: 8,469 non-empty values and 4 distinct for `channel`, 8,469 and 3 for
-`status`. Neither donut can be rendering from an empty frame.
+**Why it is not already fixed:** `stSidebarNavLink` is Streamlit's own DOM. Setting an
+attribute on it requires JavaScript against the parent document, and `ui/theme.py:184-188`
+already documents why this app cannot do that: Streamlit does not execute `<script>` tags
+passed through `st.markdown`, and `components.html` renders inside an iframe that cannot
+reach the parent. CSS can *style* the active link — that is where the colour comes from —
+but cannot add semantics. This is a real constraint, not an oversight.
 
-That leaves two candidates nobody has tested: the grouped bar at `:261`, which
-sets `xOffset` to sit bars side by side but may still emit stack fields, and the
-legend-click filter added by `_interactive`, which can narrow a selection to
-nothing at runtime. Start there rather than re-checking the donuts.
+**Options, both design decisions rather than defect repairs:**
 
-**Pros:** Either a chart disappears that was never showing anything, or a filter
-bug surfaces that is currently silent. Both are better than the present state,
-where the page looks fine and the console disagrees.
+1. A `components.html` bridge reaching out via `window.parent`. Fragile, and the
+   sanctioned API deliberately walls this off — it would break on any Streamlit release
+   that tightens the sandbox.
+2. Render the rail as custom markup instead of `st.navigation`, which would put
+   `aria-current` fully under our control but discard the routing the whole app is
+   built on.
 
-**Cons:** Warning-level only. Nothing visibly breaks, and no user has complained —
-this is the console telling on the app rather than a reported symptom.
+**Pros:** Closes the last known accessibility gap; it is the standard landmark screen
+readers look for.
 
-**Context:** Not caused by the 2026-08-01 QA fixes, which touched `styles.css`,
-`styles-dark.css`, and `ui/views/tickets.py` — no chart code. Start at
-`ui/views/dashboard.py` and look for a chart whose `_has_data` guard passes but
-whose grouped frame is empty; the dataset has known column-completeness gaps
-(see the Data integrity panel), so an empty group is plausible rather than
-surprising. Full detail in `.gstack/qa-reports/qa-report-localhost-2026-08-01.md`
-under ISSUE-008.
+**Cons:** Neither option is small, and option 1 trades a semantic gap for an upgrade
+hazard of exactly the kind `.streamlit/styles.css` line 116 is already labelled for.
 
-**Effort estimate:** S (human) → S (with CC). **Priority:** P3.
+**Context:** Pairs naturally with the "Full ARIA audit" entry above — both are rail/shell
+semantics, and doing them together is the only way option 2 could be worth its cost.
 
-**Depends on / blocked by:** Nothing.
+**Effort estimate:** M (human) → S (with CC). **Priority:** P3.
+
+**Depends on / blocked by:** Nothing technically. Worth deciding alongside the ARIA audit
+rather than on its own.
+
+## ~~Dashboard: a stacked chart is rendering from an empty dataset~~ — CLOSED, not a bug
+
+**Closed 2026-08-01 by the third `/qa` pass.** Both earlier diagnoses were wrong, and the
+warning is not this project's to fix. Kept rather than deleted because two passes have now
+been spent on it and the next reader deserves the evidence.
+
+**What it actually is:** Streamlit ships the dataframe to the browser over Arrow,
+separately from the Vega-Lite spec. Vega's first scale-domain pass therefore runs before
+the rows attach, and reports the empty-domain sentinel. Upstream behaviour, warning-level,
+no user-visible effect.
+
+**How that was established** — three independent checks, because the previous two
+hypotheses were both plausible and both wrong:
+
+1. Every chart's frame was rebuilt offline: 20, 4, 3, 5, 10 and 12 rows. **No chart is
+   handed zero rows**, which retires the original hypothesis.
+2. Warnings were attributed to charts by patching `console.warn` and recording which
+   chart containers had rendered an `<svg>`. **All six warn — including the heatmap at
+   `:362`, which never calls `_interactive`.** That retires the correction's two
+   candidates: it is not the grouped bar specifically, and selections cannot be involved.
+3. **A 20-line vanilla Streamlit app with a clean 5-row frame reproduces it exactly**,
+   with and without `theme=None`. No project code required.
+
+**Lesson worth keeping:** the first two attempts both reasoned from the symptom's shape
+(`_start`/`_end` implies stacking, therefore a stacked chart) without ever asking *which*
+chart emitted it. The attribution in step 2 took one run and immediately falsified both.
+Also logged as a gstack learning so a fourth pass does not start over.
+
+**Full detail:** `.gstack/qa-reports/qa-report-localhost-2026-08-01-round3.md`.
+
+### Superseded diagnoses, for the record
+
+This entry previously carried two hypotheses, both written as live work with a priority
+and a "start here" pointer. Both were checked and falsified by the evidence above:
+
+1. *(original, 2026-08-01)* "a stacked chart is being handed zero rows" — no chart is.
+2. *(correction, same day)* "then it is the grouped bar at `:261` or the legend filter in
+   `_interactive`" — it is neither; all six charts warn, including one with no selections.
+
+The full original text is in git history (`49af3ac`) and the reasoning that retired it is
+in `.gstack/qa-reports/qa-report-localhost-2026-08-01-round3.md`. Nothing here is
+actionable — it is kept only so a future reader recognises the dead end on sight.
