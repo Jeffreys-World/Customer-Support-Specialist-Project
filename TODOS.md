@@ -142,8 +142,21 @@ chart is receiving zero rows and either stop rendering it or say why it is empty
 
 **Why:** Surfaced by `/qa` on 2026-08-01 during the post-fix verification sweep.
 `[Infinity, -Infinity]` is Vega's empty-domain sentinel: it computes a range from
-no data. `_start`/`_end` are the fields Vega generates for a *stacked* bar, which
-narrows it to the stacked charts on the Dashboard.
+no data. `_start`/`_end` are the fields Vega generates when it *stacks* a
+quantitative field.
+
+**Correction (2026-08-01, second `/qa` pass):** the original hypothesis in this
+entry — "a chart is being handed zero rows" — was checked and is **wrong**. Both
+stacked charts on the page are the donuts in `_donut`, and both are guarded:
+`if channel:` at `ui/views/dashboard.py:284` and `if status["counts"]:` at
+`:303`, each falling through to an empty state. The underlying data is fully
+populated: 8,469 non-empty values and 4 distinct for `channel`, 8,469 and 3 for
+`status`. Neither donut can be rendering from an empty frame.
+
+That leaves two candidates nobody has tested: the grouped bar at `:261`, which
+sets `xOffset` to sit bars side by side but may still emit stack fields, and the
+legend-click filter added by `_interactive`, which can narrow a selection to
+nothing at runtime. Start there rather than re-checking the donuts.
 
 **Pros:** Either a chart disappears that was never showing anything, or a filter
 bug surfaces that is currently silent. Both are better than the present state,
