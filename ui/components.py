@@ -333,7 +333,14 @@ def filter_row(key_prefix: str, show_queue: bool = True) -> Dict[str, object]:
     # with no explanation. Found by /qa.
     from ui.domain import queues_in_use  # local import avoids a cycle at module load
 
-    widths = [4, 3, 3, 2] if show_queue else [5, 3, 2]
+    # The sort column carries a whole word plus a chevron, where the two
+    # multiselects only ever show a one-word placeholder. At 2 units it had 105px
+    # for a 114px label, so the default value rendered as "Recommen…" — the one
+    # control on the strip that states how the queue below it is ordered, and it
+    # could not say so. Widened to match its neighbours rather than trimming the
+    # label, which would have shortened the wording to fit a column instead of
+    # sizing the column to the wording. Found by /qa (ISSUE-105).
+    widths = [4, 3, 3, 3] if show_queue else [5, 3, 3]
     cols = st.columns(widths, vertical_alignment="bottom")
 
     query = cols[0].text_input(
