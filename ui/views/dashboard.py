@@ -252,6 +252,11 @@ def _volume_charts(frame: pd.DataFrame) -> None:
                 .size().reset_index(name="Tickets")
                 .rename(columns={"ticket_type": "Type", "true_priority": "Priority"})
             )
+            # The axis labels are raw dataset values ("Refund request"), so they
+            # need the same display casing the tags and titles get. Applied to
+            # the frame rather than the encoding because Vega renders the literal
+            # string it is handed. See `c.humanize` (ISSUE-005).
+            grouped["Type"] = grouped["Type"].map(c.humanize)
             chart = _interactive(
                 alt.Chart(grouped).mark_bar(cornerRadius=2).encode(
                     x=alt.X("Type:N", title=None, axis=alt.Axis(labelAngle=-25)),

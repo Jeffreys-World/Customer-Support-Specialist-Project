@@ -36,7 +36,7 @@ def render(ticket: Dict, tickets: List[Dict]) -> None:
     tok = priority(ticket["category"])
     req = demo_context.requester_for(ticket)
     c.app_bar(
-        ticket.get("subject") or "(no subject)",
+        c.humanize(ticket.get("subject") or "(no subject)"),
         f"#{ticket['id']} · {req.name} · {req.org}",
         chip=f"{tok.emoji} {tok.label}",
     )
@@ -119,7 +119,7 @@ def _properties(ticket: Dict) -> None:
             value_html=c.tags_html(signals, limit=8) if signals else "—",
         )
         c.field("Tags", None, value_html=c.tags_html(ticket.get("tags") or [], limit=8) or "—")
-        c.field("Status", ticket.get("status") or "—")
+        c.field("Status", c.humanize(ticket.get("status") or "—"))
         c.field("Resolution", domain.resolution_state(ticket))
         st.caption(
             "Resolution shows state, not the dataset's note text — those notes are "

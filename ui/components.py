@@ -29,6 +29,38 @@ def esc(value: object) -> str:
     return html.escape(str(value if value is not None else ""))
 
 
+def humanize(value: object) -> str:
+    """Capitalise a dataset label for display, without wrecking what is already there.
+
+    The dataset ships its label vocabulary in sentence case: "Refund request",
+    "Billing inquiry", "Cancellation request", "Product inquiry", "Technical
+    issue", "Social media", and the sixteen subjects. Rendered raw, those read as
+    a typo next to the console's own title-case chrome — which is what was
+    reported ("capitalize the R in Refund Request"). It is five ticket types plus
+    a channel plus every subject, not one string, because the values come from
+    the Kaggle CSV rather than from us.
+
+    ``str.title()`` is the obvious tool and it is wrong here. The same tag list
+    carries product names, so it would render "Asus ROG" as "Asus Rog" and
+    "HP Pavilion" as "Hp Pavilion" — trading a small consistency problem for a
+    wrong-word problem.
+
+    So only fully-lowercase words are touched. Anything already carrying a
+    capital is left exactly as the dataset wrote it, which preserves acronyms
+    ("ROG", "HP"), interior caps ("iPhone", "McAfee"), and labels that were
+    already correct ("Pending Customer Response").
+
+    Applies to labels only. Never call this on a ticket body or a subject line
+    that is a real sentence — this dataset's subjects are short noun phrases,
+    which is why they are safe.
+    """
+    text = str(value if value is not None else "")
+    return " ".join(
+        word[0].upper() + word[1:] if word and word.islower() else word
+        for word in text.split(" ")
+    )
+
+
 # --- Atoms --------------------------------------------------------------------
 
 def avatar_html(initials: str, color: str, cls: str = "tc-row__avatar") -> str:
@@ -85,7 +117,7 @@ def score_bar_html(score: int, color: str) -> str:
 
 def tags_html(tags: Sequence[str], limit: int = 3) -> str:
     shown = [t for t in tags if t][:limit]
-    out = "".join(f'<span class="tc-tag">{esc(t)}</span>' for t in shown)
+    out = "".join(f'<span class="tc-tag">{esc(humanize(t))}</span>' for t in shown)
     extra = len(tags) - len(shown)
     if extra > 0:
         out += f'<span class="tc-tag">+{extra}</span>'
@@ -158,7 +190,7 @@ def ticket_row(ticket: Dict, key: str, open_label: str = "Open") -> bool:
                 # "|" text node. As a text node it stayed on the name's line when
                 # a long subject wrapped, leaving a separator pointing at
                 # nothing. Found by /qa.
-                + f'<span class="tc-row__subject">{esc(ticket.get("subject") or "(no subject)")}</span>'
+                + f'<span class="tc-row__subject">{esc(humanize(ticket.get("subject") or "(no subject)"))}</span>'
                 + "</div>"
                 + '<div class="tc-row__meta">'
                 + priority_pill_html(ticket["category"])

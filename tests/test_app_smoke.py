@@ -1092,3 +1092,53 @@ def test_prefs_is_the_base_layer_and_imports_nothing_from_ui():
         "ui/prefs.py must import nothing from ui/ — it is the base of the graph, "
         "and a cycle here is what the local-import dodges elsewhere existed for"
     )
+
+
+# Regression: ISSUE-005 — the dataset ships its label vocabulary in sentence case,
+# so the console rendered "Refund request", "Billing inquiry", "Cancellation
+# request", "Product inquiry", "Technical issue" and "Social media" next to its
+# own title-case chrome. Reported as "capitalize the R in Refund Request"; it is
+# five ticket types plus a channel plus sixteen subjects, not one string.
+# Found by /qa on 2026-08-01.
+# Report: .gstack/qa-reports/qa-report-localhost-2026-08-01.md
+def test_humanize_capitalises_dataset_labels():
+    from ui.components import humanize
+
+    assert humanize("Refund request") == "Refund Request"
+    assert humanize("Billing inquiry") == "Billing Inquiry"
+    assert humanize("Cancellation request") == "Cancellation Request"
+    assert humanize("Product inquiry") == "Product Inquiry"
+    assert humanize("Technical issue") == "Technical Issue"
+    assert humanize("Social media") == "Social Media"
+
+
+def test_humanize_does_not_wreck_product_names():
+    """str.title() is the obvious tool and it is wrong: the same tag list carries
+    product names, so it would render "Asus ROG" as "Asus Rog"."""
+    from ui.components import humanize
+
+    for untouched in ("Asus ROG", "HP Pavilion", "GoPro Hero", "iPhone",
+                      "Pending Customer Response", "LG OLED"):
+        assert humanize(untouched) == untouched, (
+            f"{untouched!r} already carries capitals and must survive unchanged"
+        )
+    # The naive implementation this guards against:
+    assert "Asus ROG".title() != humanize("Asus ROG")
+
+
+def test_humanize_handles_the_empty_and_missing_cases():
+    from ui.components import humanize
+
+    assert humanize(None) == ""
+    assert humanize("") == ""
+    assert humanize("—") == "—"
+
+
+def test_no_raw_lowercase_dataset_label_reaches_the_queue():
+    """End to end: render the real queue and assert the tags are cased."""
+    at = AppTest.from_string(TICKETS_VIEW, default_timeout=120).run()
+    assert not at.exception, at.exception
+    body = _html(at)
+    for raw in ("Refund request", "Billing inquiry", "Product inquiry",
+                "Technical issue", "Cancellation request", "Social media"):
+        assert raw not in body, f"{raw!r} reached the DOM uncased"
